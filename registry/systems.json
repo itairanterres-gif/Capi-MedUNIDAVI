@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "systems": [
+    {
+      "system_id": "capi-medunidavi",
+      "name": "Capi-MedUNIDAVI",
+      "role": "Casa canônica de governança, contratos e identidade comum do produto",
+      "status": "foundation",
+      "source_of_truth_for": ["public_governance", "shared_contracts", "product_identity"],
+      "integration_state": "documentary_foundation"
+    },
+    {
+      "system_id": "treino-enamed",
+      "name": "Treino-enamed",
+      "role": "Módulo especializado de prática",
+      "status": "existing_specialized_system",
+      "source_of_truth_for": ["current_operational_domains_during_transition"],
+      "integration_state": "preserved_pending_progressive_integration"
+    },
+    {
+      "system_id": "sessao-questoes-unidavi",
+      "name": "sessao-questoes-unidavi",
+      "role": "Módulo especializado de sessões de questões",
+      "status": "existing_specialized_system",
+      "source_of_truth_for": ["future_canonical_data_destination"],
+      "integration_state": "hardening_before_convergence"
+    },
+    {
+      "system_id": "virtual-patient-pal",
+      "name": "virtual-patient-pal",
+      "role": "Módulo especializado de experiência com paciente virtual",
+      "status": "existing_specialized_system",
+      "source_of_truth_for": ["specialized_module_domain"],
+      "integration_state": "preserved_pending_contracts"
+    },
+    {
+      "system_id": "xi-sam-unidavi-v2",
+      "name": "xi-sam-unidavi-v2",
+      "role": "Módulo especializado do ecossistema formativo",
+      "status": "existing_specialized_system",
+      "source_of_truth_for": ["specialized_module_domain"],
+      "integration_state": "preserved_pending_contracts"
+    }
+  ]
+}

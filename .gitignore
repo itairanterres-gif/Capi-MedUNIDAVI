@@ -1,0 +1,42 @@
+# Configuração local e segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+
+# Dumps, exportações e bancos locais
+*.dump
+*.sql.gz
+*.bak
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+dumps/
+exports/
+
+# Material restrito ou com dados pessoais
+pii/
+patient-data/
+student-data/
+private/
+restricted/
+internal-reports/
+restricted-evidence/
+allowlists/
+
+# Artefatos temporários e do sistema
+*.tmp
+*.temp
+*.log
+*.swp
+~$*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "source_id": "claude-design-prototype",
+      "name": "Protótipo Claude Design",
+      "classification": "historical_reference",
+      "scope": "Exploração anterior de produto e interface"
+    },
+    {
+      "source_id": "persona-contracts",
+      "name": "Contratos da persona",
+      "classification": "current_source",
+      "scope": "Essência, limites e política pedagógica de Capi"
+    },
+    {
+      "source_id": "canon-medicum",
+      "name": "Canon Medicum",
+      "classification": "current_source",
+      "scope": "Patrimônio verbal versionado"
+    },
+    {
+      "source_id": "canonical-pack-v1",
+      "name": "Pack Canônico v1",
+      "classification": "current_source",
+      "scope": "Referência visual vigente"
+    },
+    {
+      "source_id": "longitudinal-blueprint",
+      "name": "Blueprint Longitudinal",
+      "classification": "proposed_target",
+      "scope": "Direção para a experiência longitudinal do produto"
+    },
+    {
+      "source_id": "a3v1",
+      "name": "A3v.1 — Caderno clínico longitudinal",
+      "classification": "experimental_reference",
+      "scope": "Referência visual experimental para o futuro shell; não é código canônico"
+    },
+    {
+      "source_id": "a0-a1",
+      "name": "A0/A1",
+      "classification": "historical_reference",
+      "scope": "Arqueologia do ecossistema e decisões históricas de fundação"
+    },
+    {
+      "source_id": "siddiqui-twelve-tips-eportfolios",
+      "name": "Siddiqui et al. — Twelve tips for introducing E-Portfolios in health professions education",
+      "classification": "implementation_reference",
+      "scope": "Referência externa de implementação e experiência; não é norma institucional da UNIDAVI",
+      "public_reference": "https://doi.org/10.1080/0142159X.2022.2053085"
+    },
+    {
+      "source_id": "nhs-foundation-trainee-pharmacist-eportfolio-guide-2024-25",
+      "name": "NHS England — Foundation Trainee Pharmacist E-portfolio User Guide 2024–25",
+      "classification": "implementation_reference",
+      "scope": "Referência operacional externa adaptável; não é norma institucional da UNIDAVI"
+    },
+    {
+      "source_id": "talat-faculty-perspective-eportfolios",
+      "name": "Talat et al. — E-Portfolios in Medical Education: A Reflective Exploration of Learning Experiences from Faculty Perspective",
+      "classification": "implementation_reference",
+      "scope": "Referência externa sobre experiências e percepções; não é norma institucional da UNIDAVI",
+      "public_reference": "https://doi.org/10.54393/pjhs.v5i12.2574"
+    },
+    {
+      "source_id": "unidavi-institutional-documents",
+      "name": "PPC, Manuais Docentes e Manual do Estudante",
+      "classification": "proposed_target",
+      "scope": "Fontes institucionais não disponíveis nesta execução; necessárias para validar exigências, competências, autonomia e periodicidades"
+    }
+  ]
+}
