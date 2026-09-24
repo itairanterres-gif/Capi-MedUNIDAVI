@@ -117,7 +117,15 @@ ANTHROPIC_API_KEY=... npm run testes
 ANTHROPIC_API_KEY=... npm run testes -- a-interno-excelente   # um roteiro só
 ```
 
-<!-- TRECHOS-TESTES -->
+### Trechos das transcrições
+
+<!-- TRECHOS-TESTES: preencher com um trecho de cada roteiro após a execução -->
+
+**Pendente de execução.** As quatro consultas ainda não foram rodadas contra a API:
+o ambiente em que este projeto foi montado não tinha `ANTHROPIC_API_KEY` disponível.
+O runner e as verificações estão prontos; basta rodar `npm run testes` com a chave
+configurada, conferir `testes/transcricoes/RESUMO.md` e colar aqui um trecho de cada
+um dos quatro roteiros.
 
 ---
 
