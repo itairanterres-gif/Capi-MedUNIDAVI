@@ -8,10 +8,10 @@ import { buildHosted } from '../build-hosted.mjs';
 const env = value => ({ CAPI_PUBLIC_ORIGIN: value, CAPI_APPROVED_PUBLIC_ORIGIN: value });
 test('publication mode refuses placeholder origins, fixture credentials and unknown targets before writing output', async () => {
   const base = { ...env('https://approved-host.unidavi.edu.br'), CAPI_AMRIGS_HOSTED: '1' };
-  await assert.rejects(buildHosted({ ...base, CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' }), /Fixture/);
-  await assert.rejects(buildHosted({ ...base, CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' }), /Fixture/);
-  await assert.rejects(buildHosted({ ...base, CAPI_HOSTING_TARGET: 'unknown' }), /Unsupported/);
-  await assert.rejects(buildHosted({ ...base, CAPI_HOSTING_TARGET: 'cloudflare-pages', CAPI_GOOGLE_ENABLED: '1' }), /Google/);
+  await assert.rejects(buildHosted({ ...base, CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' }), /production build blocked/);
+  await assert.rejects(buildHosted({ ...base, CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' }), /production build blocked/);
+  await assert.rejects(buildHosted({ ...base, CAPI_HOSTING_TARGET: 'unknown' }), /production build blocked/);
+  await assert.rejects(buildHosted({ ...base, CAPI_HOSTING_TARGET: 'cloudflare-pages', CAPI_GOOGLE_ENABLED: '1' }), /production build blocked/);
 });
 test('future origin is explicit HTTPS, not tied to the superseded Vercel origin', () => {
   assert.equal(validateHostedOrigin(env('https://approved-host.unidavi.edu.br')), 'https://approved-host.unidavi.edu.br');

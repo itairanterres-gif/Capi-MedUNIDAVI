@@ -13,11 +13,14 @@ insufficient. Deny anonymous read/list and browser writes. Verify these controls
 against actual Storage before changing this gate. The proposed namespace is the
 original package SHA256; preserve every image byte and manifest hash.
 
-The download primitive uses the existing authenticated SDK client and checks
-PNG signature/hash. It is not yet wired into the question UI. That future UI
-must gate image-dependent answers, discard stale results on navigation/logout,
-revoke blob URLs and avoid durable browser caching. No public URL or signed URL
-fallback: signed URLs outlive session revocation until expiry.
+The download primitive is wired into the question and error-notebook UI. Every
+image is checked against its manifest SHA256 and PNG signature. Answers remain
+disabled until required images decode. Errors, including 401/403/404, show a
+generic status without SDK tokens. Logout/auth refresh/navigation removes image
+sources, revokes owned Blob URLs and discards stale downloads. No public or
+signed fallback, persistent image cache or extra dependency is used.
+Tests use a synthetic PNG signature and mocked DOM decoding; actual browser
+Storage/RLS and real image decoding remain future hosted verification.
 
 Reference: https://supabase.com/docs/guides/storage/serving/downloads
 and https://supabase.com/docs/guides/storage/security/access-control

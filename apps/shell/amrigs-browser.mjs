@@ -1,3 +1,4 @@
+import { createPrivateImageView } from './private-image-ui.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { resolveIdentity } from './auth-contract.mjs';
 import { validateAuthConfig } from './config-contract.mjs';
@@ -8,15 +9,16 @@ const show = (id, yes) => { el(id).hidden = !yes; };
 const set = (id, value) => { el(id).textContent = value; };
 let client, identity, questions = [], attempts = [], session = null, feedbackId = null;
 let epoch = 0;
+let imageView, imagesReady = false;
 let activeQuestionId = null, questionOpenedAt = 0;
 const byId = () => new Map(questions.map(q => [q.id, q]));
 function option(label, value) { return new Option(label, value); }
-function imageNodes(images) {
-  return (images || []).filter(img => /^\/amrigs\/\d{4}\/[\w.-]+\.png$/.test(img.url)).map(img => {
-    const figure = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption');
-    image.src = img.url; image.alt = img.alt || 'Figura associada à questão'; image.loading = 'lazy';
-    caption.textContent = img.legenda || ''; figure.append(image, caption); return figure;
-  });
+function imageNodes(images) { return imageView.mount(images).nodes; }
+function clearPrivateView() {
+  imageView?.clear(); imagesReady = false;
+  for (const id of ['setup', 'activity', 'summary', 'notebook']) show(id, false);
+  el('images').replaceChildren(); el('errors').replaceChildren();
+  el('form').querySelector('button').disabled = true;
 }
 function setupOptions() {
   const f = el('setup-form').elements;
@@ -54,7 +56,14 @@ function renderQuestion(q) {
   show('activity', true); show('setup', false); show('summary', false);
   set('progress', `Questão ${Object.keys(session.answered).length + (finished ? 0 : 1)} de ${session.questionIds.length}`);
   set('title', b.stem); set('source', `${b.area || ''} · ${b.source || 'AMRIGS'}`);
-  el('images').replaceChildren(...imageNodes(b.images));
+  imagesReady = false;
+  const button = el('form').querySelector('button'); button.disabled = true;
+  const required = b.images || [];
+  const mounted = imageView.mount(required, { onReady(ok) {
+    imagesReady = ok && (!b.alternativesInImage || required.length > 0);
+    button.disabled = finished || !imagesReady;
+  } });
+  el('images').replaceChildren(...mounted.nodes);
   const latest = latestAttempts(attempts).get(q.id);
   el('options').replaceChildren(...b.alternatives.map(a => {
     const label = document.createElement('label'), radio = document.createElement('input'), span = document.createElement('span');
@@ -90,6 +99,7 @@ function renderSummary() {
   }));
 }
 function render() {
+  imageView?.clear(); imagesReady = false;
   for (const id of ['setup', 'activity', 'summary', 'notebook']) show(id, false);
   if (!questions.length) { set('status', 'O treino AMRIGS ainda não foi publicado para estudantes neste ambiente.'); return; }
   set('status', `${questions.length} questão(ões) liberada(s) neste ambiente de homologação.`);
@@ -112,6 +122,7 @@ async function closeSession() {
 }
 async function refresh() {
   const current = ++epoch;
+  clearPrivateView(); questions = []; attempts = []; session = null; feedbackId = null;
   try {
     identity = await resolveIdentity(client);
     if (current !== epoch) return;
@@ -134,7 +145,7 @@ async function refresh() {
 async function busy(button, task) {
   button.disabled = true;
   try { await task(); } catch { set('status', 'A operação não foi salva. Tente novamente.'); }
-  finally { button.disabled = false; }
+  finally { button.disabled = button === el('form').querySelector('button') ? !imagesReady : false; }
 }
 try {
   const response = await fetch('/auth-config.json', { cache: 'no-store' });
@@ -143,7 +154,10 @@ try {
   validateAuthConfig(config);
   client = createClient(config.url, config.key, { auth: { flowType: 'pkce', storageKey: config.storageKey,
     persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
-  client.auth.onAuthStateChange(() => setTimeout(refresh, 0));
+  imageView = createPrivateImageView({ client, contract: config.privateImages?.contract,
+    hashes: config.privateImages?.hashes || {}, document });
+  client.auth.onAuthStateChange(() => { epoch++; clearPrivateView(); setTimeout(refresh, 0); });
+  window.addEventListener('pagehide', () => { epoch++; clearPrivateView(); });
   el('setup-form').addEventListener('change', () => {
     const config = configFromForm();
     const pool = filterPool(questions, config);
@@ -162,7 +176,7 @@ try {
     void busy(event.submitter, async () => {
       const id = pending(session).find(value => byId().has(value));
       const answer = new FormData(event.target).get('answer');
-      if (!id || !answer) return;
+      if (!id || !answer || !imagesReady || identity?.role !== 'aluno') return;
       const result = await client.from('capi_training_attempts')
         .insert({ user_id: identity.subject, question_id: id, answer, confidence: 2,
           response_time_ms: Math.max(0, Date.now() - questionOpenedAt) })

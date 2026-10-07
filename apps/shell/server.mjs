@@ -26,11 +26,11 @@ export function createShell({ resolveAudience = async () => null, integration = 
       }
       const url = new URL(req.url, 'http://localhost');
       if (integration && (url.pathname === '/entrar' || url.pathname.startsWith('/questoes/') || integration.amrigsPilot && url.pathname.startsWith('/amrigs/'))) {
-        res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${integration.url} ${integration.url.replace('https:', 'wss:')}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'`);
+        res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ${integration.url} ${integration.url.replace('https:', 'wss:')}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'`);
       }
       if (integration && url.pathname === '/entrar') { send(200, renderLogin()); return; }
       if (integration && url.pathname === '/auth-config.json') {
-        send(200, JSON.stringify({ url: integration.url, key: integration.key, storageKey: integration.storageKey, googleEnabled: !!integration.googleEnabled, amrigsPilot: !!integration.amrigsPilot }), 'application/json'); return;
+        send(200, JSON.stringify({ url: integration.url, key: integration.key, storageKey: integration.storageKey, googleEnabled: !!integration.googleEnabled, amrigsPilot: !!integration.amrigsPilot, privateImages: integration.privateImages }), 'application/json'); return;
       }
       if (integration && url.pathname === '/auth.js') { send(200, await readFile(new URL('./dist/auth.js', import.meta.url)), 'text/javascript; charset=utf-8'); return; }
       if (integration?.amrigsPilot && url.pathname === '/amrigs') { res.writeHead(302, { Location: '/amrigs/' }); res.end(); return; }

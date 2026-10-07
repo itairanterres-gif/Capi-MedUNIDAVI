@@ -30,6 +30,7 @@ test('hosted AMRIGS requires explicit canonical origin, matching module, assets 
       base: '/questoes/', mode: 'supabase', project: canonicalURL, storageKey }));
     const env = { CAPI_SHARED_LOGIN: '1', CAPI_AMRIGS_HOSTED: '1', CAPI_PUBLIC_ORIGIN: 'https://capi-preparacao.invalid',
       CAPI_APPROVED_PUBLIC_ORIGIN: 'https://capi-preparacao.invalid', CAPI_LOCAL_PREPARATION: '1',
+      CAPI_AMRIGS_MANIFEST: new URL('../../../build-inputs/amrigs/manifest.json', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
       CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture', CAPI_QUESTOES_DIST: root, CAPI_AMRIGS_ASSETS: root };
     assert.equal((await loadIntegration(env)).amrigsHosted, true);
     for (const change of [{ CAPI_PUBLIC_ORIGIN: 'https://evil.invalid' },

@@ -45,7 +45,8 @@ export async function buildHosted(env = process.env) {
     await cp(path.join(integration.root, 'index.html'), path.join(output, 'questoes/index.html'));
     await cp(path.join(integration.root, 'assets'), path.join(output, 'questoes/assets'), { recursive: true });
     const imageHashes = await readApprovedAssets(env);
-    for (const [name, hash] of Object.entries(imageHashes)) {
+    // Production never exports protected images; only ignored local fixture does.
+    if (env.CAPI_LOCAL_PREPARATION === '1') for (const [name, hash] of Object.entries(imageHashes)) {
       if (!/^\d{4}\/[\w.-]+\.png$/.test(name)) throw new Error('Invalid image path');
       const bytes = await readFile(path.join(integration.amrigsAssets, name));
       if (createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('Image hash mismatch');
@@ -59,7 +60,7 @@ export async function buildHosted(env = process.env) {
       headers: [{ source: '/(.*)', headers: [
         { key: 'Cache-Control', value: 'no-store' }, { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'no-referrer' },
-        { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${integration.url} ${integration.url.replace('https:', 'wss:')}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'` },
+        { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ${integration.url} ${integration.url.replace('https:', 'wss:')}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'` },
       ] }],
     };
     if (env.CAPI_HOSTING_TARGET === 'cloudflare-pages') {

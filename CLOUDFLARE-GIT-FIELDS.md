@@ -32,7 +32,7 @@ do builder precisam do registry npm; a verificação local usou dependências
 já copiadas, sem executar npm ci ou baixar ferramentas.
 
 Todos os caminhos de insumos são calculados a partir deste checkout:
-`apps/sessao/dist-pages`, `build-inputs/amrigs/images` e
+`apps/sessao/dist-pages`, `.local-assets/amrigs` (somente fixture ignorada) e
 `build-inputs/amrigs/manifest.json`. Não há submodule, fetch Git, mirror externo
 ou caminho absoluto do computador configurado no build.
 
@@ -73,13 +73,10 @@ Documentação oficial consultada:
 https://developers.cloudflare.com/pages/configuration/build-configuration/
 https://developers.cloudflare.com/pages/configuration/build-image/
 
-## Publicação das imagens — pendência concreta
+## Imagens privadas — candidato atual
 
-As 31 imagens aprovadas por hash são recortes de questões de prova, com
-enunciados e alternativas; `2024/q060_pagina17_integral.png` contém a página
-inteira, incluindo as questões 59–62. Não são apenas diagramas sem texto.
-O arquivo JSON das 477 questões não está no commit, mas enviar esses PNG a
-um repositório público torna seu conteúdo público independentemente do
-status draft/RLS do catálogo. O preparo local mantém os arquivos intactos;
-a decisão de envio público precisa considerar essa exposição concreta.
-Não foi refeita uma auditoria editorial ou jurídica.
+Nenhum dos 31 PNGs reservados está no Git. A fixture ignorada pode conter
+originais locais; jamais enviar esse output ao hospedador. A interface usa
+apenas download autenticado, valida hash e renderiza blob com ciclo de vida.
+O contrato atual é unprovisioned. Produção para antes da instalação e da saída.
+Operações futuras delimitadas em proposals/REMOTE-APPROVAL.md.

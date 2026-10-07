@@ -1,5 +1,6 @@
 import { realpath, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { readApprovedAssets } from './approved-assets.mjs';
 import { requireLocalImageFixture } from './private-images.mjs';
 import { canonicalURL, storageKey } from './auth-contract.mjs';
 import { validateHostedOrigin } from './config-contract.mjs';
@@ -25,9 +26,13 @@ export async function loadIntegration(env = process.env) {
     validateHostedOrigin(env);
   }
   const enabled = env.CAPI_AMRIGS_PILOT === '1' || hosted;
-  const amrigsAssets = enabled && env.CAPI_AMRIGS_ASSETS ? await realpath(env.CAPI_AMRIGS_ASSETS) : null;
-  if (hosted && !amrigsAssets) throw new Error('Hosted AMRIGS assets required');
-  return { root, url: expectedURL, key, storageKey: expectedStorageKey,
+  const amrigsAssets = enabled && (!hosted || env.CAPI_LOCAL_PREPARATION === '1') && env.CAPI_AMRIGS_ASSETS ? await realpath(env.CAPI_AMRIGS_ASSETS) : null;
+  if (hosted && env.CAPI_LOCAL_PREPARATION === '1' && !amrigsAssets) throw new Error('Hosted AMRIGS assets required');
+  const privateImages = hosted ? {
+    contract: JSON.parse(await readFile(new URL('../../build-inputs/amrigs/private-storage.contract.json', import.meta.url), 'utf8')),
+    hashes: await readApprovedAssets(env),
+  } : null;
+  return { privateImages, root, url: expectedURL, key, storageKey: expectedStorageKey,
     googleEnabled: !localURL && env.CAPI_GOOGLE_ENABLED === '1', amrigsPilot: enabled, amrigsHosted: hosted, amrigsAssets };
 }
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };

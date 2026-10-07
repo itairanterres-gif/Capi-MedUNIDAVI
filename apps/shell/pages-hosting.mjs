@@ -9,7 +9,7 @@ export function pagesHeaders(url) {
   X-Frame-Options: DENY
   X-Robots-Tag: noindex, nofollow
   ! Access-Control-Allow-Origin
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${url} ${url.replace('https:', 'wss:')}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ${url} ${url.replace('https:', 'wss:')}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'
 `;
 }
 
