@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "title": "Sobre o Capi MedUNIDAVI",
+  "home": {
+    "name": "Capi MedUNIDAVI",
+    "tagline": "Seu ambiente longitudinal de formação médica.",
+    "description": "Aprenda, pratique, receba feedback, revise e conecte cada experiência à sua trajetória.",
+    "link": "Conheça o Capi →"
+  },
+  "common": [
+    {
+      "id": "ambiente",
+      "title": "Um ambiente, um percurso",
+      "paragraphs": [
+        "Capi MedUNIDAVI é um ambiente educacional longitudinal em desenvolvimento para apoiar a formação médica. Sua proposta é conectar experiências de aprendizagem ao longo do curso: aprender → praticar → receber feedback → revisar → integrar à trajetória.",
+        "Questões, flashcards, pacientes virtuais, atividades de aula e avaliações formativas são experiências que o projeto busca conectar em um mesmo percurso. O e-Portfólio é um domínio central planejado para relacionar experiências, evidências, feedback, reflexão e próximos passos ao longo do tempo.",
+        "Ferramentas são meios. A formação longitudinal é o produto. As capacidades descritas aqui expressam a proposta do Capi; sua disponibilidade depende da etapa de desenvolvimento e dos recursos habilitados em cada módulo."
+      ]
+    },
+    {
+      "id": "origem",
+      "title": "De onde vem o Capi",
+      "paragraphs": [
+        "A identidade de Capi nasce em Rio do Sul, na convivência da cidade com seus rios, enchentes e capivaras. A capivara já estava presente na cultura do curso de Medicina, na Atlética e nas manifestações da comunidade estudantil.",
+        "Capi não foi criado como mascote para um aplicativo. Quando o projeto precisou de uma identidade, ele já fazia parte da comunidade. Ele apenas vestiu o jaleco.",
+        "O Capi é um professor médico capivara e a identidade pedagógica do ambiente. É uma persona única: sua maneira de orientar se adapta ao contexto, ao papel de quem o utiliza e à etapa da formação."
+      ]
+    }
+  ],
+  "roles": {
+    "estudante": {
+      "label": "Estudante",
+      "title": "Quem é Capi para mim?",
+      "paragraphs": [
+        "Capi é o mentor do Capi MedUNIDAVI. Sua proposta é acompanhar sua trajetória e adaptar a maneira de ensinar ao contexto e à etapa da formação.",
+        "Quando os recursos estiverem disponíveis, ele pode ajudar você a recuperar conceitos, discutir casos, organizar revisões, interpretar feedback, identificar possíveis lacunas e considerar próximos passos. Também pode formular perguntas que façam você pensar.",
+        "Ele não existe apenas para entregar respostas. Sua função é ajudar você a raciocinar, aprender com o erro e desenvolver autonomia. No e-Portfólio planejado, pode apoiar a leitura de evidências e a reflexão, preservando sua voz e a autoria daquilo que você viveu.",
+        "Isso pode significar fazer uma pergunta, reconstruir um raciocínio ou oferecer uma explicação direta quando você precisar. O erro deve ser acolhido sem humilhação; a orientação deve partir do que aconteceu na atividade, distinguindo evidência, interpretação e incerteza."
+      ],
+      "principle": "É espelho, nunca juiz.",
+      "limits": "Capi não substitui professor, tutor, preceptor ou orientador. Não decide competência, autonomia em APC, remediação ou progressão e não escreve uma reflexão como se tivesse vivido uma experiência por você. As decisões e o acompanhamento continuam com as pessoas responsáveis pela sua formação."
+    },
+    "docente": {
+      "label": "Docente / preceptor",
+      "title": "Como Capi trabalha comigo?",
+      "paragraphs": [
+        "Para docentes e preceptores, Capi é um mentor pedagógico digital e uma interface inteligente de apoio à docência. Seu trabalho é apoiar o professor e recuperar contexto para que ele possa orientar melhor.",
+        "Conforme os recursos habilitados, pode auxiliar na preparação de atividades, elaboração e revisão de questões, organização de materiais, geração inicial de conteúdos e preparação de feedback. Também pode apoiar a análise de evidências educacionais, o acompanhamento longitudinal e a reflexão sobre próximos passos.",
+        "Capi pode aparecer quando houver uma necessidade pedagógica ou orientadora real. Telas de cadastro, configuração ou outras operações não precisam de personagem ou fala.",
+        "A orientação deve preservar as evidências e os critérios usados na atividade. Capi pode ajudar a escolher como explicar ou perguntar, sem alterar silenciosamente uma avaliação. Em simulações, o mentor, o paciente e o avaliador têm funções distintas."
+      ],
+      "principle": "O professor interpreta, orienta e decide; Capi organiza, sugere e apoia.",
+      "limits": "Capi não atribui competência, define aprovação ou reprovação, determina autonomia em APC ou decide remediação. Não substitui o julgamento docente nem se torna autoridade final sobre conteúdo. “É espelho, nunca juiz” também vale para o apoio à docência: a síntese de IA é insumo para análise humana."
+    },
+    "coordenacao": {
+      "label": "Coordenação",
+      "title": "Como Capi apoia a gestão da formação?",
+      "paragraphs": [
+        "Capi pode apoiar a coordenação na organização de informações, leitura longitudinal, síntese de evidências e identificação de dados que merecem atenção. Conforme as capacidades habilitadas, pode recuperar contexto, preparar relatórios e ajudar a acompanhar processos.",
+        "Esse apoio deve preservar origem, finalidade e limites das evidências. Treino, simulação, autorrelato e avaliação institucional não se tornam medidas equivalentes por aparecerem juntos."
+      ],
+      "principle": "Capi ajuda a compreender o percurso; as decisões acadêmicas permanecem humanas.",
+      "limits": "Capi não decide progressão ou remediação, não classifica automaticamente estudantes e não gera ranking global de competência. Não substitui colegiados, coordenação ou docentes responsáveis. É espelho, nunca juiz."
+    }
+  },
+  "shared": [
+    {
+      "id": "ia",
+      "title": "Como usamos inteligência artificial",
+      "paragraphs": [
+        "Capi não é um único modelo de IA. É a identidade pedagógica do sistema. Modelos e provedores por trás dessa identidade podem mudar, preservando os princípios do projeto.",
+        "A inteligência artificial pode apoiar geração e revisão de conteúdos, organização e recuperação de informações, comparação de evidências, adaptação de explicações, preparação de feedback, reflexão, identificação de possíveis lacunas e sugestão de próximos passos.",
+        "Modelos de IA podem errar, omitir informações, inventar fatos ou referências — as chamadas alucinações — e apresentar respostas convincentes sem base suficiente. Por isso, adotamos evidência antes de eloquência. Quando relevante, a origem e as referências precisam acompanhar a informação. Concordância entre modelos não equivale a validação documental.",
+        "A IA sugere, organiza, gera e interpreta. O aplicativo executa ações, persiste e distribui conteúdo e controla estado e acesso. Decisões pedagógicas e institucionais críticas permanecem humanas: a IA não atribui sozinha nota, conceito, autonomia em APC ou competência, nem decide remediação ou progressão."
+      ]
+    },
+    {
+      "id": "canon",
+      "title": "Canon Medicum: história, fontes e atribuições",
+      "paragraphs": [
+        "O Canon Medicum é o repertório histórico de Capi. Ele aproxima ciência, clínica, ética e humanismo quando uma referência ajuda a compreender uma experiência. Não precisa aparecer em toda conversa: frequentemente, a melhor orientação não contém citação alguma.",
+        "Citação literal, tradução, excerto, paráfrase e adaptação são formas diferentes de usar uma fonte. Uma adaptação de Capi não deve receber aspas e autoria como se fosse uma frase antiga. Na primeira apresentação, a tradução precisa permitir compreender a ideia sem conhecer outro idioma.",
+        "As referências ajudam a aproximar a história da Medicina das experiências de hoje. Sua origem e seu contexto importam tanto quanto a frase: textos mais amplos devem ser compreendidos como um todo, sem serem reduzidos a mensagens de efeito."
+      ]
+    },
+    {
+      "id": "governanca",
+      "title": "Conteúdo, autoria e governança",
+      "paragraphs": [
+        "O uso de IA não significa que todo conteúdo tenha passado por revisão humana. A existência de revisão e liberação depende do módulo, do fluxo editorial e do estado de cada conteúdo. Um rascunho gerado, uma sugestão de IA e um material revisado não devem ser apresentados como equivalentes.",
+        "Consulte as indicações de origem, autoria, versão e revisão disponíveis no recurso. Na ausência de indicação de revisão, não presuma que ela ocorreu. Sugestões de Capi, feedback docente e orientações institucionais devem permanecer distinguíveis.",
+        "Professores e responsáveis pelo projeto mantêm a responsabilidade pelas decisões editoriais e pedagógicas. O estudante permanece autor de suas reflexões e experiências; Capi pode ajudá-lo a pensar, sem tomar sua voz.",
+        "A origem da questão, de sua explicação e do feedback pode ser diferente. Uma questão oficial continua sendo um item de fonte oficial mesmo quando recebe uma explicação gerada por IA. Quando houver revisão, deve ficar claro se ela foi humana, por outra IA ou combinada; revisão por IA não significa revisão docente. Um registro antigo sem essa informação permanece com revisão não esclarecida."
+      ]
+    },
+    {
+      "id": "limites",
+      "title": "Uso educacional e limites",
+      "paragraphs": [
+        "Capi foi concebido para aprendizagem. Não substitui avaliação clínica real, julgamento profissional ou decisão assistencial e não deve ser usado como base única para o cuidado de pacientes. Respostas podem estar incompletas, desatualizadas ou incorretas; dúvidas devem ser discutidas com docentes e verificadas nas fontes pertinentes.",
+        "Em simulações, falhas do paciente virtual ou do sistema precisam ser distinguidas das ações do estudante. Uma falha técnica não deve ser atribuída automaticamente ao seu desempenho."
+      ]
+    },
+    {
+      "id": "problema",
+      "title": "Avisar problema",
+      "paragraphs": [
+        "Erros de conteúdo, fontes duvidosas, ambiguidades, linguagem inadequada e falhas técnicas precisam ter um caminho de revisão. O projeto prevê um reporte contextual nas atividades, com indicação de possível prejuízo à resposta ou avaliação e acompanhamento pelos responsáveis.",
+        "Nesta prévia local, o canal de envio ainda não está conectado. Nenhum relato é coletado ou enviado por esta página. Reportar um problema não deve reduzir nota nem alterar o desempenho automaticamente; um possível efeito na avaliação precisa de revisão humana."
+      ]
+    },
+    {
+      "id": "privacidade",
+      "title": "Privacidade e dados",
+      "paragraphs": [
+        "Finalidade educacional clara, uso apenas dos dados necessários, segurança, controle de acesso e transparência orientam o projeto. O acesso deve respeitar papel, contexto e finalidade, distinguindo conteúdo pessoal, compartilhado e registros institucionais.",
+        "Retomar seu histórico exige que esse contexto esteja disponível e que seu uso seja autorizado. Memória de aprendizagem e familiaridade com conceitos não se confundem com dados clínicos de pacientes ou com o estado de uma simulação. Esta prévia não mantém memória longitudinal; apresenta somente contextos fictícios para leitura.",
+        "Dados clínicos usados em atividades educacionais devem ser anonimizados. Não inclua nomes, documentos, imagens identificáveis ou detalhes que permitam reconhecer pacientes. A simples retirada do nome pode não impedir a identificação.",
+        "Esta apresentação não constitui uma política institucional de privacidade nem declara uma base legal. A definição formal de responsabilidades, bases legais, prazos de retenção, canal para exercício de direitos e tratamento por fornecedores depende de validação com os responsáveis institucionais e o encarregado de proteção de dados (DPO), no âmbito da LGPD. Essas definições permanecem pendentes; não se presume aprovação institucional."
+      ]
+    },
+    {
+      "id": "instituicao",
+      "title": "Relação com os sistemas institucionais",
+      "paragraphs": [
+        "Capi MedUNIDAVI é atualmente um ambiente educacional em desenvolvimento, que funciona de forma própria. Ainda não representa implantação oficial da UNIDAVI e não substitui os sistemas acadêmicos oficiais.",
+        "Usar uma autenticação existente não equivale a integrar dados ou processos administrativos institucionais. Não há integração operacional atual com Mentor ou Google Workspace administrativo.",
+        "Uma eventual integração deverá ocorrer em fase própria, por conexões e contratos explícitos que definam responsabilidades e limites. Identificadores de sistemas externos não se tornam automaticamente a identidade central de uma pessoa no Capi."
+      ]
+    },
+    {
+      "id": "creditos",
+      "title": "Quem faz o Capi MedUNIDAVI",
+      "credits": [
+        {
+          "role": "Idealização e coordenação pedagógica",
+          "name": "Prof. Itairan da Silva Terres",
+          "detail": "Coordenação Adjunta do Curso de Medicina"
+        },
+        {
+          "role": "Coordenação do Curso de Medicina",
+          "name": "Prof. Luís Eduardo Mendes Zanis"
+        },
+        {
+          "role": "Conteúdo e curadoria pedagógica",
+          "name": "Docentes e preceptores participantes do Curso de Medicina da UNIDAVI."
+        },
+        {
+          "role": "Desenvolvimento e arquitetura",
+          "name": "Projeto Capi MedUNIDAVI, com colaboração técnica das pessoas e equipes participantes em cada etapa."
+        }
+      ]
+    },
+    {
+      "id": "creditos-ia",
+      "title": "Inteligência artificial no desenvolvimento",
+      "paragraphs": [
+        "Diferentes ferramentas de IA generativa vêm sendo utilizadas na concepção, pesquisa, prototipagem, programação, revisão e documentação do projeto. Entre os usos registrados estão tecnologias da OpenAI e da Anthropic; o registro poderá ser ampliado conforme outras ferramentas efetivamente utilizadas forem documentadas.",
+        "Essas ferramentas são instrumentos de trabalho. Sua participação no desenvolvimento não indica que todos esses fornecedores operem no aplicativo. Decisões pedagógicas, editoriais, institucionais e de produto permanecem sob responsabilidade humana."
+      ]
+    }
+  ]
+}

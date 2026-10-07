@@ -1,0 +1,12 @@
+{
+  "name": "capi-medunidavi-pages",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build:pages": "node scripts/build-pages.mjs",
+    "build:pages:fixture": "node scripts/build-pages.mjs --local-fixture",
+    "test:pages": "node --test scripts/*.test.mjs"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "capi-medunidavi-shell",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.mjs", "build": "node build.mjs", "build:hosted": "node build.mjs && node build-hosted.mjs", "build:pages": "node build-pages.mjs", "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@supabase/supabase-js": "2.110.8" },
+  "devDependencies": { "esbuild": "0.25.12" }
+}

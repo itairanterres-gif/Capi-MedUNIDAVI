@@ -1,0 +1,37 @@
+{
+  "name": "sessao-questoes-unidavi",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "seed:questoes": "tsx scripts/seed-questoes.ts",
+    "importar:alunos": "tsx scripts/importar-alunos.ts",
+    "senha": "tsx scripts/definir-senha.ts"
+  },
+  "//": "Ferramentas de build ficam em dependencies (não devDependencies) de PROPÓSITO: a Vercel roda o install com NODE_ENV=production, que pula devDependencies — e aí o build quebra com 'vite: command not found'. Em dependencies, são sempre instaladas.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "ts-fsrs": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "playwright": "^1.62.0",
+    "tsx": "^4.23.1",
+    "xlsx": "^0.18.5"
+  }
+}

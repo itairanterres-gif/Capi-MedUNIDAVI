@@ -1,0 +1,33 @@
+import { content, escapeHTML, renderAbout } from '../../packages/public-about/index.mjs';
+import { navigation, moduleLink, trainingLinks } from './navigation.mjs';
+
+export function renderHome(integrated = false, amrigsPilot = false, hosted = false) {
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Capi MedUNIDAVI</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/identity.css"><link rel="stylesheet" href="/shell.css"></head>
+<body><a class="skip-link" href="#conteudo">Ir ao conteúdo</a>
+<header><a class="brand" href="/">Capi Med<span>UNIDAVI</span></a><span class="stage">Em desenvolvimento</span></header>${navigation('home')}
+<main class="shell-home" id="conteudo"><h1>${escapeHTML(content.home.tagline)}</h1><p class="lead">${escapeHTML(content.home.description)}</p><a href="/sobre">${escapeHTML(content.home.link)}</a>
+<section class="start-experience" aria-labelledby="experience-title"><p class="eyebrow">APRENDER E PRATICAR</p><h2 id="experience-title">Participe de uma sessão de questões</h2><p>Abra a Sessão de Questões para acessar suas atividades e continuar o trabalho no próprio módulo.</p>${integrated ? '<a class="module-link" href="/entrar">Entrar no Capi MedUNIDAVI →</a><p class="access-note">Use sua conta já existente na Sessão de Questões.</p>' : moduleLink() + '<p class="access-note">O acesso à sua conta acontece na Sessão de Questões.</p>'}</section>
+${trainingLinks(amrigsPilot, hosted)}</main><footer>Capi MedUNIDAVI · Ambiente educacional em desenvolvimento · <a href="/sobre">Sobre o Capi MedUNIDAVI</a></footer></body></html>`;
+}
+export function renderLogin() {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Entrar · Capi MedUNIDAVI</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/shell.css"><script type="module" src="/auth.js"></script></head>
+<body><a class="skip-link" href="#conteudo">Ir ao conteúdo</a><header><a class="brand" href="/">Capi MedUNIDAVI</a><span class="stage">Em desenvolvimento</span></header>${navigation('login')}
+<main class="shell-home login" id="conteudo"><h1>Entre no Capi MedUNIDAVI</h1><p>Use sua conta da Sessão de Questões.</p><p id="auth-message" role="status" aria-live="polite">Verificando sua sessão…</p><p id="account"></p>
+<form id="login-form" hidden><button id="google" type="button">Entrar com Google institucional</button><p>ou entre com sua senha</p><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required maxlength="254"><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required maxlength="1024"><button type="submit">Entrar com senha</button><p><a href="/questoes/">Recuperar acesso ou criar minha conta</a></p></form>
+<a id="launch-module" class="module-link" href="/questoes/" hidden>Abrir Sessão de Questões →</a><p><button id="retry" type="button">Verificar acesso novamente</button> <button id="logout" type="button" hidden>Sair desta sessão</button></p><p><a id="account-about" href="/sobre">Sobre o Capi MedUNIDAVI</a></p><noscript>Ative JavaScript para entrar. O Sobre permanece disponível.</noscript></main></body></html>`;
+}
+export function renderShellAbout(perspective) {
+  // The approved article remains owned by the shared package; only its frame changes.
+  return renderAbout(perspective, { navigation: navigation('about') })
+    .replace('</head>', '<link rel="stylesheet" href="/shell.css"></head>');
+}
+export function renderAmrigsPilot(hosted = false) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${hosted ? 'Treino AMRIGS' : 'AMRIGS · homologação local'}</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/shell.css"><script type="module" src="/amrigs.js"></script></head>
+<body><a class="skip-link" href="#conteudo">Ir ao conteúdo</a><header><a class="brand" href="/">Capi MedUNIDAVI</a><span class="stage">${hosted ? 'Treino formativo' : 'Piloto local'}</span></header>${navigation('amrigs')}
+<main class="shell-home amrigs" id="conteudo"><h1>Treino AMRIGS</h1><p>${hosted ? 'Treine com sua conta institucional do Capi.' : 'Homologação local com a conta do Capi.'} Questões editoriais em rascunho não são exibidas.</p><p id="amrigs-status" role="status" aria-live="polite">Validando sua conta…</p><p id="amrigs-account"></p>
+<section id="amrigs-setup" hidden><h2>Montar sessão</h2><form id="amrigs-setup-form"><label>Quantidade <select name="quantity"><option>10</option><option selected>20</option><option>40</option></select></label><label>Área <select name="area"><option value="">Todas</option></select></label><label>Ano <select name="year"><option value="">Todos</option></select></label><label>Prioridade <select name="priority"><option value="ineditas">Inéditas primeiro</option><option value="erros">Revisar erros</option><option value="aleatorio">Aleatório</option></select></label><p id="amrigs-pool"></p><button type="submit">Começar sessão</button></form></section>
+<section id="amrigs-activity" hidden><p id="amrigs-progress"></p><h2 id="amrigs-title"></h2><p id="amrigs-source"></p><div id="amrigs-images"></div><form id="amrigs-form"><fieldset><legend>Escolha uma alternativa</legend><div id="amrigs-options"></div></fieldset><button type="submit">Confirmar resposta</button></form><div id="amrigs-feedback" role="status" hidden></div><button id="amrigs-next" type="button" hidden>Próxima questão</button><button id="amrigs-abandon" type="button">Encerrar sessão</button></section>
+<section id="amrigs-summary" hidden><h2>Sessão concluída</h2><p id="amrigs-score"></p><div id="amrigs-area-summary"></div><button id="amrigs-new" type="button">Nova sessão</button></section>
+<section id="amrigs-notebook" hidden><h2>Caderno de erros</h2><p id="amrigs-history"></p><div id="amrigs-errors"></div><button id="amrigs-review" type="button">Revisar erros</button></section><p><a href="/">Voltar ao início</a></p></main></body></html>`;
+}
