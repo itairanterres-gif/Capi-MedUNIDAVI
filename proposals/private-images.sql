@@ -14,6 +14,8 @@ END $$;
 CREATE TABLE public.capi_amrigs_image_manifest (
   object_name text PRIMARY KEY,
   legacy_path text UNIQUE NOT NULL CHECK (legacy_path ~ '^[0-9]{4}/[A-Za-z0-9_.-]+[.]png$'),
+  -- Enable only after all question content embedded in this object is released.
+  delivery_enabled boolean NOT NULL DEFAULT false,
   sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
   CHECK (object_name = '0b9a12ab60d721dc0fe2268ce17df025966c0101d23269f65a1129463fa5ec40/' || legacy_path)
 );
@@ -66,7 +68,7 @@ FOR ALL TO PUBLIC USING (
    SELECT 1 FROM public.capi_amrigs_image_manifest m
    JOIN public.capi_training_questions q ON q.context = 'AMRIGS'
    AND q.editorial_status = 'human_reviewed' AND q.student_visible
-   WHERE m.object_name = storage.objects.name
+   WHERE m.delivery_enabled AND m.object_name = storage.objects.name
    AND EXISTS (SELECT 1 FROM jsonb_array_elements(
      CASE WHEN jsonb_typeof(q.body->'images') = 'array' THEN q.body->'images' ELSE '[]'::jsonb END
    ) image WHERE image->>'url' = '/amrigs/' || m.legacy_path)

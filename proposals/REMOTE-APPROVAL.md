@@ -18,7 +18,11 @@ Operações remotas futuras — proposta para uma aprovação única, ainda não
 4. Verificar com sessões autorizadas existentes: aluno elegível + questão
    liberada recebe objeto; sem matrícula, staff/egresso, anônimo, sessão expirada,
    draft ou outro contexto são negados. Listagem, URL pública, assinatura e
-   INSERT/UPDATE/DELETE pelo cliente devem ser negados. Não publicar itens só
+   INSERT/UPDATE/DELETE pelo cliente devem ser negados. O manifesto nasce com
+   `delivery_enabled=false`: habilitar cada objeto somente se todo conteúdo
+   embutido estiver liberado. A página integral q060 contém questões 59–62;
+   liberar apenas a questão vinculada não autoriza o restante da página.
+   Sem correspondência completa, manter esse objeto negado e a resposta bloqueada. Não publicar itens só
    para realizar esse teste; usar fixture controlada/conta de ensaio existente
    dentro do escopo aprovado, ou manter gate se isso não for possível.
 5. Só após evidência hospedada: registrar contrato verificado (bucket/prefixo),
