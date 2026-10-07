@@ -1,3 +1,4 @@
+import { currentPilotContract, pilotQuestionAllowed } from './pilot-runtime.mjs';
 import { createPrivateImageView } from './private-image-ui.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { resolveIdentity } from './auth-contract.mjs';
@@ -9,7 +10,7 @@ const show = (id, yes) => { el(id).hidden = !yes; };
 const set = (id, value) => { el(id).textContent = value; };
 let client, identity, questions = [], attempts = [], session = null, feedbackId = null;
 let epoch = 0;
-let imageView, imagesReady = false;
+let imageView, pilotContract, imagesReady = false;
 let activeQuestionId = null, questionOpenedAt = 0;
 const byId = () => new Map(questions.map(q => [q.id, q]));
 function option(label, value) { return new Option(label, value); }
@@ -128,7 +129,7 @@ async function refresh() {
     if (current !== epoch) return;
     if (!identity) { location.replace('/entrar?next=%2Famrigs%2F'); return; }
     set('account', `${identity.name} · ${identity.label}`);
-    if (identity.role !== 'aluno') { set('status', 'O treino está disponível somente para estudantes.'); return; }
+    if (!['aluno', 'egresso'].includes(identity.role)) { set('status', 'O treino está disponível somente para estudantes.'); return; }
     const [q, a, s] = await Promise.all([
       client.from('capi_training_questions').select('id,body').eq('context', 'AMRIGS').eq('editorial_status', 'human_reviewed').eq('student_visible', true),
       client.from('capi_training_attempts').select('id,question_id,answer,is_correct,created_at').eq('user_id', identity.subject).order('created_at').order('id'),
@@ -136,7 +137,7 @@ async function refresh() {
     ]);
     if (q.error || a.error || s.error) throw q.error || a.error || s.error;
     if (current !== epoch) return;
-    questions = q.data.filter(validQuestion); attempts = a.data;
+    questions = q.data.filter(validQuestion).filter(value => pilotQuestionAllowed(pilotContract, value.id)); attempts = a.data;
     session = s.data ? { config: s.data.config, questionIds: s.data.question_ids,
       answered: s.data.answered, startedAt: s.data.started_at } : null;
     render();
@@ -154,6 +155,7 @@ try {
   validateAuthConfig(config);
   client = createClient(config.url, config.key, { auth: { flowType: 'pkce', storageKey: config.storageKey,
     persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  pilotContract = config.privateImages?.contract;
   imageView = createPrivateImageView({ client, contract: config.privateImages?.contract,
     hashes: config.privateImages?.hashes || {}, document });
   client.auth.onAuthStateChange(() => { epoch++; clearPrivateView(); setTimeout(refresh, 0); });
@@ -176,7 +178,7 @@ try {
     void busy(event.submitter, async () => {
       const id = pending(session).find(value => byId().has(value));
       const answer = new FormData(event.target).get('answer');
-      if (!id || !answer || !imagesReady || identity?.role !== 'aluno') return;
+      if (!id || !answer || !imagesReady || !['aluno', 'egresso'].includes(identity?.role) || !pilotQuestionAllowed(pilotContract, id)) return;
       const result = await client.from('capi_training_attempts')
         .insert({ user_id: identity.subject, question_id: id, answer, confidence: 2,
           response_time_ms: Math.max(0, Date.now() - questionOpenedAt) })
@@ -197,6 +199,10 @@ try {
       await saveSession(); render();
     });
   });
+  if (currentPilotContract(pilotContract)) {
+    setTimeout(() => { epoch++; clearPrivateView(); set('status', 'O prazo deste piloto encerrou.'); },
+      Math.max(0, Date.parse(pilotContract.expiresAt) - Date.now()));
+  }
   window.addEventListener('pageshow', refresh);
   await refresh();
 } catch { set('status', 'O treino AMRIGS local não está disponível.'); }

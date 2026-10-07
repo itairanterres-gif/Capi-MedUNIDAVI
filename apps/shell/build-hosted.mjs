@@ -2,8 +2,7 @@
 import { mkdir, writeFile, readFile, cp, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { requireLocalImageFixture } from './private-images.mjs';
+import { hostedReleaseContract } from './hosted-release-contract.mjs';
 import { loadIntegration } from './integration.mjs';
 import { validateHostedOrigin } from './config-contract.mjs';
 import { pagesHeaders, pagesRedirects, notFoundHTML } from './pages-hosting.mjs';
@@ -13,7 +12,7 @@ import { publicAssets } from '../../packages/public-about/assets.mjs';
 
 export async function buildHosted(env = process.env) {
   if (env.CAPI_AMRIGS_HOSTED !== '1') throw new Error('Explicit hosted configuration required');
-  requireLocalImageFixture(env);
+  hostedReleaseContract(env);
   const origin = validateHostedOrigin(env);
   if (env.CAPI_LOCAL_PREPARATION !== '1' && /fixture|synthetic/.test(env.CAPI_SUPABASE_PUBLISHABLE_KEY || ''))
     throw new Error('Fixture key is local preparation only');
@@ -44,16 +43,8 @@ export async function buildHosted(env = process.env) {
     await mkdir(path.join(output, 'questoes'), { recursive: true });
     await cp(path.join(integration.root, 'index.html'), path.join(output, 'questoes/index.html'));
     await cp(path.join(integration.root, 'assets'), path.join(output, 'questoes/assets'), { recursive: true });
-    const imageHashes = await readApprovedAssets(env);
-    // Production never exports protected images; only ignored local fixture does.
-    if (env.CAPI_LOCAL_PREPARATION === '1') for (const [name, hash] of Object.entries(imageHashes)) {
-      if (!/^\d{4}\/[\w.-]+\.png$/.test(name)) throw new Error('Invalid image path');
-      const bytes = await readFile(path.join(integration.amrigsAssets, name));
-      if (createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('Image hash mismatch');
-      const target = path.join(output, 'amrigs', name);
-      await mkdir(path.dirname(target), { recursive: true });
-      await writeFile(target, bytes);
-    }
+    // All hosted outputs, including local fixtures, contain no protected PNGs.
+    await readApprovedAssets(env);
     const config = {
       outputDirectory: 'hosted-dist',
       rewrites: [{ source: '/questoes/:path*', destination: '/questoes/index.html' }],

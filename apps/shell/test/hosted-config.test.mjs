@@ -34,7 +34,7 @@ test('hosted AMRIGS requires explicit canonical origin, matching module, assets 
       CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture', CAPI_QUESTOES_DIST: root, CAPI_AMRIGS_ASSETS: root };
     assert.equal((await loadIntegration(env)).amrigsHosted, true);
     for (const change of [{ CAPI_PUBLIC_ORIGIN: 'https://evil.invalid' },
-      { CAPI_PUBLIC_ORIGIN: '' }, { CAPI_AMRIGS_ASSETS: '' },
+      { CAPI_PUBLIC_ORIGIN: '' }, { CAPI_LOCAL_PREPARATION: '0' },
       { CAPI_LOCAL_SUPABASE_URL: 'http://127.0.0.1:28478' }])
       await assert.rejects(loadIntegration({ ...env, ...change }));
   } finally { await rm(root, { recursive: true, force: true }); }

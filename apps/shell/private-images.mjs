@@ -1,17 +1,9 @@
-// Production remains closed until the private delivery and server authorization
-// contract are implemented and verified. An environment flag cannot approve it.
-export function requireLocalImageFixture(env) {
-  if (env.CAPI_LOCAL_PREPARATION !== '1' || env.CF_PAGES === '1' || env.CI === 'true')
-    throw new Error('Private Supabase images unprovisioned: production build blocked');
-}
-
+import { currentPilotContract } from './pilot-runtime.mjs';
 // Future delivery primitive: no public URLs, signed links or anonymous fallback.
 // Caller must supply the existing authenticated Supabase client and reviewed map.
 export async function downloadPrivateImage(client, contract, name, hashes) {
-  if (contract?.state !== 'verified' || contract.private !== true || !contract.bucket ||
-      !/^[a-z0-9-]+$/.test(contract.bucket) || !/^[a-f0-9]{64}$/.test(contract.prefix || ''))
-    throw new Error('Private image contract incomplete');
-  if (!/^\d{4}\/[\w.-]+\.png$/.test(name) || !Object.hasOwn(hashes, name))
+  if (!currentPilotContract(contract)) throw new Error('Private image contract incomplete');
+  if (!/^\d{4}\/[\w.-]+\.png$/.test(name) || !Object.hasOwn(hashes, name) || !contract.imagePaths.includes(name))
     throw new Error('Image outside approved manifest');
   const { data: auth, error: authError } = await client.auth.getUser();
   if (authError || !auth?.user || auth.user.is_anonymous) throw new Error('Authentication required');
@@ -22,5 +14,6 @@ export async function downloadPrivateImage(client, contract, name, hashes) {
     throw new Error('Invalid PNG');
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2,'0')).join('');
   if (hash !== hashes[name]) throw new Error('Image hash mismatch');
+  if (!currentPilotContract(contract)) throw new Error('Private image contract expired');
   return data;
 }

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "scope": "pilot",
+  "project": "https://ggjxbumtnizaeomioves.supabase.co",
+  "origin": null,
+  "questionId": "efa5a06b-83ea-53df-8b1e-7a67fe5d22c2",
+  "imagePath": "2019/q085_pg19.png",
+  "packageSHA256": "0b9a12ab60d721dc0fe2268ce17df025966c0101d23269f65a1129463fa5ec40",
+  "checks": {
+    "participantIdentifiedEligible": false,
+    "pilotRlsVerified": false,
+    "noOtherContexts": false,
+    "negativeSqlVerified": false,
+    "negativeHttpVerified": false,
+    "bucketPrivate": false,
+    "pathsTypesSizesVerified": false,
+    "singleContentApproved": false,
+    "activationVerified": false,
+    "publicationApproved": false,
+    "canonicalIdentityVerified": false,
+    "individualAccessGrantVerified": false
+  },
+  "policyReadbackSHA256": null,
+  "checkedAt": null,
+  "expiresAt": null,
+  "remoteDownloadedSHA256": "not-yet-performed",
+  "positiveJwtFlow": "not-yet-performed",
+  "wholeCorpusValidated": false,
+  "note": "Pending pilot-specific readback. Prior corpus preparation is recorded separately. No account identity or credential belongs in this file.",
+  "participantAccessMode": "pending"
+}

@@ -1,6 +1,6 @@
 export const canonicalURL = 'https://ggjxbumtnizaeomioves.supabase.co';
 export const storageKey = 'sb-ggjxbumtnizaeomioves-auth-token';
-const roles = Object.freeze({ aluno: 'Estudante', professor: 'Docente', admin: 'Administrador da Sessão de Questões' });
+const roles = Object.freeze({ aluno: 'Estudante', professor: 'Docente', admin: 'Administrador da Sessão de Questões', egresso: 'Egresso participante do piloto' });
 
 // Presentation only. Data authorization stays in the module's RLS/RPCs.
 export async function resolveIdentity(client) {

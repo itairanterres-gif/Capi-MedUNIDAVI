@@ -1,7 +1,7 @@
 import { realpath, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { readApprovedAssets } from './approved-assets.mjs';
-import { requireLocalImageFixture } from './private-images.mjs';
+import { hostedReleaseContract } from './hosted-release-contract.mjs';
 import { canonicalURL, storageKey } from './auth-contract.mjs';
 import { validateHostedOrigin } from './config-contract.mjs';
 
@@ -21,15 +21,14 @@ export async function loadIntegration(env = process.env) {
   if (env.CAPI_AMRIGS_PILOT === '1' && !localURL) throw new Error('AMRIGS pilot is local-only');
   const hosted = env.CAPI_AMRIGS_HOSTED === '1';
   if (hosted) {
-    requireLocalImageFixture(env);
+    hostedReleaseContract(env);
     if (localURL) throw new Error('Hosted AMRIGS requires canonical Auth');
     validateHostedOrigin(env);
   }
   const enabled = env.CAPI_AMRIGS_PILOT === '1' || hosted;
-  const amrigsAssets = enabled && (!hosted || env.CAPI_LOCAL_PREPARATION === '1') && env.CAPI_AMRIGS_ASSETS ? await realpath(env.CAPI_AMRIGS_ASSETS) : null;
-  if (hosted && env.CAPI_LOCAL_PREPARATION === '1' && !amrigsAssets) throw new Error('Hosted AMRIGS assets required');
+  const amrigsAssets = enabled && !hosted && env.CAPI_AMRIGS_ASSETS ? await realpath(env.CAPI_AMRIGS_ASSETS) : null;
   const privateImages = hosted ? {
-    contract: JSON.parse(await readFile(new URL('../../build-inputs/amrigs/private-storage.contract.json', import.meta.url), 'utf8')),
+    contract: hostedReleaseContract(env),
     hashes: await readApprovedAssets(env),
   } : null;
   return { privateImages, root, url: expectedURL, key, storageKey: expectedStorageKey,

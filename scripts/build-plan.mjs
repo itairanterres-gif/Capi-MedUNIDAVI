@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { requireLocalImageFixture } from '../apps/shell/private-images.mjs';
+import { hostedReleaseContract } from '../apps/shell/hosted-release-contract.mjs';
 import { validateHostedOrigin } from '../apps/shell/config-contract.mjs';
 import { canonicalURL } from '../apps/shell/auth-contract.mjs';
 
@@ -17,13 +17,13 @@ export function buildPlan(root, input, { fixture = false } = {}) {
     CAPI_SUPABASE_PUBLISHABLE_KEY: key, CAPI_GOOGLE_ENABLED: '0', CAPI_LOCAL_SUPABASE_URL: '', CAPI_AMRIGS_PILOT: '0',
     CAPI_QUESTOES_DIST: path.join(root, 'apps/sessao/dist-pages'),
     CAPI_AMRIGS_MANIFEST: path.join(root, 'build-inputs/amrigs/manifest.json'),
-    CAPI_AMRIGS_ASSETS: path.join(root, '.local-assets/amrigs'), CAPI_AMRIGS_PACKAGE: '',
+    CAPI_AMRIGS_ASSETS: '', CAPI_AMRIGS_PACKAGE: '',
     VITE_CAPI_INTEGRATED: '1', VITE_CAPI_LOCAL_HOMOLOGATION: '0', VITE_DATA_MODE: 'supabase',
     VITE_SUPABASE_URL: canonicalURL, VITE_SUPABASE_ANON_KEY: key,
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
     npm_config_update_notifier: 'false',
   };
-  requireLocalImageFixture(env);
+  hostedReleaseContract(env);
   validateHostedOrigin(env);
   return { env, installs: fixture ? [] : ['apps/sessao', 'apps/shell'], output: path.join(root, 'apps/shell/hosted-dist') };
 }

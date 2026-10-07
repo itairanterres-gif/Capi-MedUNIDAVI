@@ -9,8 +9,9 @@ import { readApprovedAssets } from '../apps/shell/approved-assets.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 test('relocation computes all inputs inside the checkout and ignores inherited external paths', () => {
   const result = buildPlan(root, { CAPI_AMRIGS_ASSETS: '/external/private', CAPI_QUESTOES_DIST: '/old/mirror' }, { fixture: true });
-  for (const name of ['CAPI_AMRIGS_ASSETS', 'CAPI_QUESTOES_DIST', 'CAPI_AMRIGS_MANIFEST'])
+  for (const name of ['CAPI_QUESTOES_DIST', 'CAPI_AMRIGS_MANIFEST'])
     assert.ok(result.env[name].startsWith(root));
+  assert.equal(result.env.CAPI_AMRIGS_ASSETS, '');
   assert.equal(result.installs.length, 0);
   assert.equal(result.output, path.join(root, 'apps/shell/hosted-dist'));
   assert.equal(result.env.VITE_SUPABASE_ANON_KEY, result.env.CAPI_SUPABASE_PUBLISHABLE_KEY);
