@@ -102,13 +102,23 @@ async function main() {
   await mkdir(saidaDir, { recursive: true });
   const uso = { [MODELO]: { in: 0, out: 0, cacheR: 0, cacheW: 0 }, [VERIFICADOR]: { in: 0, out: 0, cacheR: 0, cacheW: 0 } };
   const somar = (m, u) => { const s = uso[m]; s.in += u.input_tokens || 0; s.out += u.output_tokens || 0; s.cacheR += u.cache_read_input_tokens || 0; s.cacheW += u.cache_creation_input_tokens || 0; };
-  const resultados = [];
-  for (const [i, linha] of linhas.entries()) {
+  // Retomável: o que já está em grifos.json não é refeito (exceto erros).
+  const arquivo = path.join(saidaDir, 'grifos.json');
+  const anterior = await readFile(arquivo, 'utf8').then(JSON.parse).catch(() => null);
+  const resultados = (anterior?.resultados || []).filter(r => !r.status.startsWith('erro'));
+  const feitos = new Set(resultados.map(r => r.id));
+  const fila = linhas.filter(l => !feitos.has(l.id));
+  let gravando = Promise.resolve();
+  const gravar = () => (gravando = gravando.then(() => writeFile(arquivo, JSON.stringify({ modelo: MODELO, verificador: VERIFICADOR, uso, resultados }, null, 2))));
+  let proximo = 0;
+  async function trabalhador() { while (proximo < fila.length) { const i = proximo++; await processar(fila[i], i); } }
+  async function processar(linha, i) {
     const b = typeof linha.body === 'string' ? JSON.parse(linha.body) : linha.body;
     const alternativas = b.alternatives.map(a => `${a.id}) ${a.text}`).join('\n');
     const justificativa = [b.pearl, ...b.alternatives.map(a => a.rationale ? `${a.id}: ${a.rationale}` : '')].filter(Boolean).join('\n');
     const pedido = `ENUNCIADO:\n${b.stem}\n\nALTERNATIVAS:\n${alternativas}\n\nGABARITO: ${b.correct}\n\nJUSTIFICATIVA DA BANCA/EDITORIAL:\n${justificativa}`;
     const r = { id: linha.id, fonte: b.source, area: b.area, stem: b.stem, correct: b.correct, pistas: [], descartes: [], verificacao: null, status: '' };
+    if ((b.images || []).length || b.alternativesInImage) { r.status = 'sem pistas'; r.motivo = 'questão com figura'; resultados.push(r); return; }
     try {
       const g = await chamar(apiKey, MODELO, REGRAS, pedido);
       somar(MODELO, g.uso);
@@ -126,9 +136,13 @@ async function main() {
       }
     } catch (e) { r.status = 'erro: ' + e.message; }
     resultados.push(r);
-    console.log(`${String(i + 1).padStart(2)}/${linhas.length} ${r.status} · ${r.fonte}`);
+    if (resultados.length % 10 === 0) await gravar();
+    if (r.status.startsWith('erro')) console.log(`${r.status} · ${r.fonte}`);
   }
-  await writeFile(path.join(saidaDir, 'grifos.json'), JSON.stringify({ modelo: MODELO, verificador: VERIFICADOR, uso, resultados }, null, 2));
+  await Promise.all(Array.from({ length: Number(process.env.GRIFO_PARALELO || 3) }, trabalhador));
+  await gravar();
+  const cont = {}; resultados.forEach(x => { const k = x.status.split(':')[0]; cont[k] = (cont[k] || 0) + 1; });
+  console.log('Resumo:', JSON.stringify(cont));
   console.log('Uso de tokens:', JSON.stringify(uso));
 }
 
