@@ -54,3 +54,6 @@ RESULTADOS-GIT-LOCAL.json
 
 .local-assets/
 build-inputs/amrigs/images/
+
+# SAM pré-compilado (gerado por apps/sam/build.mjs)
+apps/sam/dist/

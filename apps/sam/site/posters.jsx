@@ -1,0 +1,1594 @@
+/* ============================================================
+   XI SAM 2026 — COMPONENTES
+   3 modos: PosterVitrine | PosterCompleto | TrabalhoLeitura
+   Telas auxiliares: SiteHeader
+   Figuras aparecem NA SEÇÃO escolhida pelo aluno; principal em
+   destaque; mais de uma na mesma seção respeita a ordem.
+   ============================================================ */
+const vbadge = { fontSize: 18, fontWeight: 700, padding: "6px 16px", borderRadius: 999, background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.32)", whiteSpace: "nowrap" };
+const vbadgeSm = { fontSize: 13.5, fontWeight: 700, padding: "4px 12px", borderRadius: 999, background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.32)", whiteSpace: "nowrap" };
+
+/* utilidades de figuras (compartilhadas) */
+const _autoresStr = (t, sep) => Array.isArray(t.autores) ? t.autores.join(sep) : (t.autores || "");
+const _palavrasArr = (t) => Array.isArray(t.palavras) ? t.palavras : (t.palavras ? String(t.palavras).split(",").map(s=>s.trim()).filter(Boolean) : []);
+const _refsArr = (t) => (t.referencias || "").split("\n").map(s=>s.trim()).filter(Boolean);
+/* 8ª fase apresentada como RESUMO (texto), não como pôster estruturado */
+const _ehResumo8 = (t) => Number(t.fase) === 8 && !!t.resumo_completo;
+
+/* ===== AJUSTE_LAYOUT (DOC 3) — leitura ADITIVA, sem medir nada =====
+   String JSON gravada por aluno/curadora. Ausente/inválida => null =>
+   o renderizador segue 100% na heurística de auto-fit atual (fallback).
+   Presente => o renderizador APLICA tamanhos discretos por figura e o
+   número de colunas. Chave de figura = "<Rótulo da seção>:<índice>". */
+function parseAjuste(t) {
+  try {
+    const raw = t && t.ajuste_layout;
+    if (!raw) return null;
+    const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!o || typeof o !== "object") return null;
+    return o;
+  } catch (e) { return null; }
+}
+/* Chave de ajuste_layout por figura — ESPELHA SAM_AJUSTE.chavesDe (ajuste.js):
+   "<rótulo da seção no esquema do desenho>:<índice da figura no seu bucket>".
+   Garante que a chave LIDA aqui seja idêntica à GRAVADA pelo editor, mesmo
+   quando a figura está numa seção que o desenho não renderiza (ex.: "Discussão"
+   num estudo padrão) e acaba exibida noutra seção. Indexado por f.ordem.
+   Usa só o esquema (não depende de ajuste.js estar carregado). */
+function _ajKeyPorOrdem(t) {
+  const secMap = {};
+  const esq = (typeof window !== "undefined" && window.SAM_ESQUEMA && window.SAM_ESQUEMA.secoesDe) ? window.SAM_ESQUEMA.secoesDe(t) : [];
+  esq.forEach((s) => { if (s.sec) secMap[s.sec] = s.rotulo; });
+  const counts = {}, map = {};
+  figsOrdenadas(t).forEach((fg) => {
+    const b = fg.secao || "Outra";
+    const idx = counts[b] || 0; counts[b] = idx + 1;
+    map[fg.ordem] = (secMap[b] || b) + ":" + idx;
+  });
+  return map;
+}
+
+/* ===== AJUSTE AUTOMÁTICO (pôsteres FIT, sem scroll) =====
+   ORÇAMENTO com pisos e escada ALTERNADA: figuras e texto cedem em
+   rev(ezamento, proporcionalmente à distância de seus pisos (figFrac
+   0.88→0.40, texto 1→0.60) — nenhum dos dois é sacrificado até o chão
+   enquanto o outro nem começou a ceder. Só com AMBOS nos pisos:
+   desliga prioridade da ★ principal → texto até 0.50 → `estourou`
+   (sinaliza, recorta limpo, refs na faixa ao pé — sempre visíveis).
+   Sobrando espaço, a DEVOLUÇÃO também é alternada e na ordem inversa
+   da importância: reativa prioridade da ★ → devolve teto das figuras →
+   só então cresce o texto (teto 1.5). Cada devolução que estoura é
+   desfeita e trava (anti-oscilação por recurso). */
+function useAutoFitTexto(t, pisoTexto = 0.6, pisoMin = 0.5) {
+  const ref = React.useRef(null);
+  const [st, setSt] = React.useState({ fator: 1, figFrac: 0.88, semPrioridade: false, estourou: false });
+  const [altura, setAltura] = React.useState(0);
+  const [, reMedir] = React.useState(0);
+  const ctl = React.useRef({ teto: 1.5, tetoFig: 0.96, prioTravada: false, ultima: "" });
+  React.useLayoutEffect(() => { ctl.current = { teto: 1.5, tetoFig: 0.96, prioTravada: false, ultima: "" }; setSt({ fator: 1, figFrac: 0.88, semPrioridade: false, estourou: false }); }, [t]);
+  /* re-mede quando o conteúdo muda de tamanho — ResizeObserver + load das
+     imagens + um timeout de segurança (iframes ocultos não disparam RO) */
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const bump = () => reMedir((x) => x + 1);
+    let ro;
+    if (typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(bump); ro.observe(el.firstElementChild || el); }
+    const imgs = Array.from(el.querySelectorAll("img"));
+    imgs.forEach((im) => { if (!im.complete) im.addEventListener("load", bump, { once: true }); });
+    const tid = setTimeout(bump, 1200);
+    return () => { if (ro) ro.disconnect(); clearTimeout(tid); imgs.forEach((im) => im.removeEventListener("load", bump)); };
+  }, [t]);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (Math.abs(el.clientHeight - altura) > 1) { setAltura(el.clientHeight); return; }
+    const { fator, figFrac, semPrioridade, estourou } = st;
+    if (estourou) return; /* esgotado: recorte limpo + sinalização */
+    const passo = 0.05;
+    const eH = el.scrollWidth > el.clientWidth + 2;
+    const eV = el.scrollHeight > el.clientHeight + 2;
+    if (eH || eV) {
+      if (ctl.current.ultima === "cresceu") {
+        /* crescimento de TEXTO causou estouro → desfaz e trava o teto */
+        ctl.current.teto = Math.min(ctl.current.teto, fator);
+        ctl.current.ultima = "encolheu";
+        setSt((s) => ({ ...s, fator: Math.round((s.fator - 0.02) * 100) / 100 }));
+        return;
+      }
+      if (ctl.current.ultima === "cresceuFig") {
+        /* devolução de FIGURA causou estouro → desfaz e trava */
+        ctl.current.tetoFig = Math.min(ctl.current.tetoFig, figFrac);
+        ctl.current.ultima = "fig";
+        setSt((s) => ({ ...s, figFrac: Math.round((s.figFrac - 0.08) * 100) / 100 }));
+        return;
+      }
+      if (ctl.current.ultima === "cresceuPrio") {
+        /* reativar a prioridade da ★ causou estouro → desfaz e trava */
+        ctl.current.prioTravada = true;
+        ctl.current.ultima = "prio";
+        setSt((s) => ({ ...s, semPrioridade: true }));
+        return;
+      }
+      /* escada alternada: cede quem está mais longe do próprio piso */
+      const figProg = (figFrac - 0.4) / (0.88 - 0.4);
+      const txtProg = (fator - pisoTexto) / (1.0 - pisoTexto);
+      if (figFrac > 0.4 && figProg >= txtProg) {
+        ctl.current.ultima = "fig";
+        setSt((s) => ({ ...s, figFrac: Math.max(0.4, Math.round((s.figFrac - 0.08) * 100) / 100) }));
+      } else if (fator > pisoTexto) {
+        ctl.current.ultima = "encolheu";
+        setSt((s) => ({ ...s, fator: Math.max(pisoTexto, Math.round((s.fator - passo) * 100) / 100) }));
+      } else if (figFrac > 0.4) {
+        ctl.current.ultima = "fig";
+        setSt((s) => ({ ...s, figFrac: Math.max(0.4, Math.round((s.figFrac - 0.08) * 100) / 100) }));
+      } else if (!semPrioridade) {
+        /* antes de esconder conteúdo: desliga a prioridade da ★ principal */
+        ctl.current.ultima = "prio";
+        setSt((s) => ({ ...s, semPrioridade: true }));
+      } else if (fator > pisoMin) {
+        ctl.current.ultima = "encolheu";
+        setSt((s) => ({ ...s, fator: Math.max(pisoMin, Math.round((s.fator - passo) * 100) / 100) }));
+      } else {
+        ctl.current.ultima = "estourou";
+        setSt((s) => ({ ...s, estourou: true }));
+      }
+      return;
+    }
+    /* DEVOLUÇÃO alternada enquanto o fim do conteúdo estiver longe do pé da
+       última coluna (folga máxima tolerada: 4% da altura): primeiro reativa a
+       prioridade da ★, depois devolve teto às figuras, por fim cresce o texto */
+    const inner = el.firstElementChild;
+    const ultimo = inner && inner.lastElementChild;
+    if (ultimo) {
+      const a = el.getBoundingClientRect(), b = ultimo.getBoundingClientRect();
+      if (a.bottom - b.bottom > a.height * 0.04) {
+        if (semPrioridade && !ctl.current.prioTravada) {
+          ctl.current.ultima = "cresceuPrio";
+          setSt((s) => ({ ...s, semPrioridade: false }));
+        } else if (figFrac + 0.08 <= Math.min(0.88, ctl.current.tetoFig - 0.01)) {
+          ctl.current.ultima = "cresceuFig";
+          setSt((s) => ({ ...s, figFrac: Math.round((s.figFrac + 0.08) * 100) / 100 }));
+        } else if (Math.round((fator + 0.02) * 100) / 100 < ctl.current.teto) {
+          ctl.current.ultima = "cresceu";
+          setSt((s) => ({ ...s, fator: Math.round((s.fator + 0.02) * 100) / 100 }));
+        }
+      }
+    }
+  });
+  return [ref, st, altura];
+}
+/* Canvas que PREENCHE o viewport: largura fixa BW, altura derivada do aspecto
+   real do container (clamp) — elimina as barras pretas do letterbox. */
+function useFillViewport(BW) {
+  const ref = React.useRef(null);
+  const [dim, setDim] = React.useState(() => {
+    const w = window.innerWidth || 1280, h = window.innerHeight || 800;
+    const BH0 = Math.round(Math.min(1150, Math.max(660, BW * (h / w))));
+    return { scale: Math.min(w / BW, h / BH0), BH: BH0 };
+  });
+  React.useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const medir = () => {
+      // viewport REAL (janela) é o alvo do fit — clientWidth/Height do wrapper
+      // pode reportar o tamanho do CONTEÚDO (cartão) no 1º layout → scale errado.
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let w = el.clientWidth, h = el.clientHeight;
+      // usa a janela como base; só cai no wrapper se a janela não estiver disponível
+      w = vw || w; h = vh || h;
+      if (!w || !h) return;
+      const BH = Math.round(Math.min(1150, Math.max(660, BW * (h / w))));
+      const scale = Math.min(w / BW, h / BH);
+      setDim((p) => (Math.abs(p.scale - scale) > 0.002 || p.BH !== BH ? { scale, BH } : p));
+    };
+    medir();
+    const raf = requestAnimationFrame(medir);
+    const ts = [setTimeout(medir, 200), setTimeout(medir, 600)];
+    const iv = setInterval(medir, 700); const ivStop = setTimeout(() => clearInterval(iv), 8000);
+    const ro = new ResizeObserver(medir); ro.observe(el);
+    window.addEventListener("resize", medir);
+    window.addEventListener("orientationchange", medir);
+    return () => { cancelAnimationFrame(raf); ts.forEach(clearTimeout); clearInterval(iv); clearTimeout(ivStop); ro.disconnect(); window.removeEventListener("resize", medir); window.removeEventListener("orientationchange", medir); };
+  }, [BW]);
+  return [ref, dim.scale, dim.BH];
+}
+/* Fator de ajuste corrente {fator, altura da coluna em px de layout} —
+   consumido pelas figuras para dimensionar tetos proporcionais à coluna */
+const FitContext = React.createContext({ fator: 1, altura: 0, figFrac: 0.88, semPrioridade: false, s: 1 });
+/* Corpo do pôster com ajuste automático: o wrapper externo segura o espaço
+   (flex:1) e recorta; o interno recebe o zoom calculado e ALTURA FIXA com
+   columnFill:auto — cada coluna enche completamente antes da próxima (sem
+   pé vazio na 1ª coluna). Figuras width:100% mantêm a largura visual da
+   coluna em qualquer fator — só o texto muda de tamanho. */
+function CorpoAjustavel({ t, style, children, refsFluxo, refsBanda, padX = 0, pisoTexto = 0.6, pisoMin = 0.5 }) {
+  const [ref, st, altura] = useAutoFitTexto(t, pisoTexto, pisoMin);
+  const alturaCol = altura ? Math.floor(altura / st.fator) : 0;
+  const fitVal = React.useMemo(() => ({ fator: st.fator, altura: alturaCol, figFrac: st.figFrac, semPrioridade: st.semPrioridade }), [st.fator, st.figFrac, st.semPrioridade, alturaCol]);
+  /* clip-path no fim da ÚLTIMA coluna visível: colunas excedentes começam
+     dentro do padding direito — sem o clip, uma tira delas aparece na borda */
+  return (
+    <>
+      <div ref={ref} style={{ flex: 1, minHeight: 0, overflow: "hidden", position: "relative" }}>
+        <FitContext.Provider value={fitVal}>
+          <div style={{ zoom: st.fator, height: alturaCol || "auto", boxSizing: "border-box", columnFill: "balance", clipPath: padX ? `inset(0 ${padX}px 0 0)` : undefined, ...style }}>
+            {children}
+            {!st.estourou && refsFluxo}
+          </div>
+        </FitContext.Provider>
+        {st.estourou && (
+          <div style={{ position: "absolute", right: 16, bottom: 10, background: "#FFF8E6", border: "1px solid #F0DCA8", color: "#7A5C12", borderRadius: 999, padding: "5px 14px", fontSize: 12.5, fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+            Texto excede o espaço do pôster — conteúdo completo no celular (QR)
+          </div>
+        )}
+      </div>
+      {st.estourou && refsBanda}
+    </>
+  );
+}
+/* Faixa de referências ao pé (usada quando o texto estourou o orçamento) —
+   sempre visível, a menor fonte da página, máx. 6 itens + contador */
+function RefsBanda({ t, cor, colunas = 3, pad = "7px 40px 9px" }) {
+  const refs = _refsArr(t);
+  if (!refs.length) return null;
+  const vis = refs.slice(0, 6);
+  const resto = refs.length - vis.length;
+  return (
+    <div style={{ flexShrink: 0, background: "#fff", borderTop: "1px solid #E3EAF2", padding: pad }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: cor, textTransform: "uppercase", letterSpacing: 0.6 }}>
+        Referências{refs.length > 6 ? ` · 6 de ${refs.length}` : ""}{resto > 0 ? " (completas no QR)" : ""}
+      </span>
+      <ol style={{ margin: "3px 0 0", paddingLeft: 16, columnCount: colunas, columnGap: 26 }}>
+        {vis.map((l, i) => <li key={i} style={{ fontSize: 10.5, lineHeight: 1.3, color: C.cinza, marginBottom: 2, breakInside: "avoid" }}>{l}</li>)}
+      </ol>
+    </div>
+  );
+}
+/* ===== RODAPÉ DE REFERÊNCIAS (faixa fixa, sempre presente no telão) =====
+   Espaço dedicado no pé do pôster: ALTURA FIXA, 3 colunas, no máx. 6 fontes,
+   fonte AUTOAJUSTÁVEL para caber. Tira as referências do FLUXO do texto (que
+   fazia o sistema esquecer de computar o espaço delas e quebrar) e devolve ao
+   corpo uma altura previsível. >6 → "lista completa no QR". */
+function RodapeRefs({ t, cor, altura = 96, cols = 3, maxRefs = 6 }) {
+  const refs = _refsArr(t);
+  const olRef = React.useRef(null);
+  const [fs, setFs] = React.useState(9.5);
+  React.useLayoutEffect(() => { setFs(9.5); }, [t]);
+  React.useLayoutEffect(() => {
+    const el = olRef.current; if (!el) return;
+    if (el.scrollHeight > el.clientHeight + 1 && fs > 5.5) setFs((f) => Math.max(5.5, Math.round((f - 0.5) * 10) / 10));
+  });
+  if (!refs.length) return null;
+  const vis = refs.slice(0, maxRefs);
+  const resto = refs.length - vis.length;
+  return (
+    <div style={{ flex: `0 0 ${altura}px`, height: altura, boxSizing: "border-box", background: C.papel, borderTop: "1px solid #E3EAF2", padding: "6px 18px 8px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: cor, textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0, marginBottom: 3 }}>
+        Referências{refs.length > maxRefs ? <span style={{ fontWeight: 600, color: C.cinza, textTransform: "none", letterSpacing: 0 }}> · {maxRefs} de {refs.length} — lista completa no QR</span> : null}
+      </div>
+      <ol ref={olRef} style={{ margin: 0, paddingLeft: 15, columnCount: cols, columnGap: 18, flex: 1, minHeight: 0, overflow: "hidden", fontSize: fs, lineHeight: 1.22 }}>
+        {vis.map((l, i) => <li key={i} style={{ color: C.cinza, marginBottom: 1.5, breakInside: "avoid" }}>{l}</li>)}
+      </ol>
+    </div>
+  );
+}
+/* Referências NO FLUXO do texto (fim da última coluna) — máx. 6 visíveis */
+function RefsInline({ t, cor, max = 6 }) {
+  const refs = _refsArr(t);
+  if (!refs.length) return null;
+  const vis = refs.slice(0, max);
+  const resto = refs.length - vis.length;
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize:16, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, borderBottom:`3px solid ${cor}33`, paddingBottom:5, marginBottom:7 }}>
+        Referências{refs.length > max ? <span style={{ fontWeight:600, color:C.cinza, textTransform:"none", letterSpacing:0 }}> · {max} de {refs.length}</span> : null}
+      </div>
+      <ol style={{ margin:0, paddingLeft:18 }}>
+        {vis.map((l, i) => <li key={i} style={{ fontSize:12.5, lineHeight:1.35, color:C.cinza, marginBottom:4, breakInside:"avoid" }}>{l}</li>)}
+      </ol>
+      {resto > 0 && <div style={{ fontSize:12, color:C.cinza, marginTop:5, fontStyle:"italic" }}>+{resto} referência{resto>1?"s":""} — lista completa no modo leitura (QR).</div>}
+    </div>
+  );
+}
+function figsOrdenadas(t) {
+  const arr = Array.isArray(t.figuras) ? t.figuras.slice() : [];
+  return arr.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+}
+function figsPorSecao(t) {
+  const figs = figsOrdenadas(t);
+  const pega = (secs) => figs.filter((f) => secs.includes(f.secao));
+  const usadas = new Set(["Introdução", "Métodos", "Resultados"]);
+  return {
+    intro: pega(["Introdução"]),
+    metodos: pega(["Métodos"]),
+    resultados: pega(["Resultados"]),
+    conclusao: pega(["Discussão"]),
+    outras: figs.filter((f) => !usadas.has(f.secao) && f.secao !== "Discussão"),
+  };
+}
+/* Seções a renderizar, NA ORDEM e com os RÓTULOS do esquema do desenho
+   (esquema.js — fonte única, briefing item 2). Resolve o texto (chave de
+   dado estável) e as figuras (bucket canônico f.secao). Figuras em buckets
+   que o desenho não usa caem em `outras` → "Figuras complementares". */
+function secoesRender(t) {
+  const esquema = (window.SAM_ESQUEMA && typeof window.SAM_ESQUEMA.secoesDe === "function") ? window.SAM_ESQUEMA.secoesDe(t) : [];
+  const figs = figsOrdenadas(t);
+  const usadas = new Set();
+  const secoes = esquema.map((s) => {
+    const f = s.sec ? figs.filter((fg) => fg.secao === s.sec) : [];
+    f.forEach((fg) => usadas.add(fg));
+    const texto = s.chave === "intro" ? (t.intro || t.introducao) : t[s.chave];
+    return { campo: s.chave, rotulo: s.rotulo, texto: texto || "", figs: f };
+  });
+  const outras = figs.filter((fg) => !usadas.has(fg));
+  return { secoes, outras };
+}
+
+/* ===== MODO 1 — VITRINE (chamariz fixo escalado, galeria do telão) ===== */
+function PosterVitrine({ t }) {
+  const BW = 720, BH = 1280;
+  const [ref, scale] = useScale(BW);
+  const cor = AREA_COR[t.area] || C.azul;
+  const figs = figsOrdenadas(t);
+  const principal = figs.find((f) => f.principal) || figs[0] || null;
+  const figUrl = principal && (principal.url || principal.dataUrl);
+  return (
+    <div ref={ref} style={{ width:"100%", aspectRatio:`${BW} / ${BH}`, position:"relative", overflow:"hidden", borderRadius:14, background:`linear-gradient(160deg, ${C.azul}, ${C.azulEsc})` }}>
+      <div style={{ position:"absolute", top:0, left:0, width:BW, height:BH, transform:`scale(${scale})`, transformOrigin:"top left", color:"#fff", padding:48, display:"flex", flexDirection:"column", boxSizing:"border-box" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28, flexWrap:"wrap", gap:10 }}>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            <span style={vbadge}>{t.fase}ª FASE</span><span style={vbadge}>{t.desenho}</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, fontSize:22, fontWeight:600 }}>
+            <span style={{ width:18, height:18, borderRadius:5, background:cor, border:"2px solid rgba(255,255,255,0.5)" }} />{t.area}
+          </div>
+        </div>
+        <div style={{ fontSize:54, fontWeight:800, lineHeight:1.08, letterSpacing:-0.7, marginBottom:26 }}>{t.titulo}</div>
+        <div style={{ fontSize:23, opacity:0.92, marginBottom:36, lineHeight:1.4 }}>
+          {_autoresStr(t, " · ")}
+          {Number(t.fase) !== 7 && t.orientador ? <><br /><span style={{ opacity:0.75 }}>Orient.: {t.orientador}</span></> : null}
+          {t.afiliacao ? <><br /><span style={{ opacity:0.75, fontStyle:"italic" }}>{t.afiliacao}</span></> : null}
+        </div>
+        <div style={{ flex:1, background:"rgba(255,255,255,0.08)", border:"2px dashed rgba(255,255,255,0.32)", borderRadius:16, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", textAlign:"center", padding:28, marginBottom:34, minHeight:200, overflow:"hidden" }}>
+          {figUrl
+            ? <img src={figUrl} alt="" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:8 }} />
+            : <ImageIcon size={72} color={C.ciano} />}
+          {principal && <div style={{ fontSize:20, marginTop:16, opacity:0.92, lineHeight:1.3 }}>{principal.legenda}</div>}
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:22, marginBottom:24 }}>
+          <div style={{ background:"#fff", padding:14, borderRadius:14 }}><QRCode id={t.id} size={150} /></div>
+          <div>
+            <div style={{ fontSize:26, fontWeight:700, display:"flex", alignItems:"center", gap:10 }}><Smartphone size={26} /> Leia completo</div>
+            <div style={{ fontSize:20, opacity:0.9, marginTop:4 }}>no celular</div>
+          </div>
+        </div>
+        <div style={{ borderTop:"1px solid rgba(255,255,255,0.22)", paddingTop:18, display:"flex", alignItems:"center", justifyContent:"flex-end" }}>
+          <div style={{ fontSize:21, fontWeight:800, letterSpacing:1, color:C.ciano }}>SAM · MEDICINA UNIDAVI</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* figura do pôster completo — DESTAQUE: largura da coluna; teto proporcional
+   à coluna. Prioridades RELATIVAS (somadas ao figFrac corrente, então descem
+   JUNTO com a escada do orçamento): ★ principal +0.20, vertical (portrait,
+   detectada ao carregar) +0.12, principal E vertical +0.30 — fluxogramas
+   ganham quase a coluna inteira quando há espaço, e cedem quando não há.
+   Em `semPrioridade` (penúltimo degrau) todas valem o figFrac base. */
+function FigPoster({ f, cor }) {
+  const url = f.url || f.dataUrl;
+  const fit = React.useContext(FitContext);
+  const s = fit.s || 1;
+  // aspecto medido ao carregar: vertical = mais alta que larga; muitoAlta = ≥1,8:1
+  const [asp, setAsp] = React.useState(null);   // naturalHeight/naturalWidth
+  const vertical = asp != null && asp > 1.0;
+  const muitoAlta = asp != null && asp >= 1.8;
+  const portrait = vertical;
+  const extra = fit.semPrioridade ? 0 : (f.principal ? (portrait ? 0.3 : 0.2) : (portrait ? 0.12 : 0));
+  const frac = Math.min(0.92, (fit.figFrac || 0.88) + extra);
+  /* portrait com legenda AO LADO não gasta altura embaixo → teto maior */
+  const teto = (fit && fit.altura ? Math.max(170, Math.round(fit.altura * frac * s) - (portrait ? 16 : 56)) : Math.round(360 * frac));
+  /* Figuras LANDSCAPE são limitadas pela LARGURA — então a escada do orçamento
+     precisa encolher a LARGURA para liberar espaço (reduzir só maxHeight não faz
+     nada numa figura larga). widthFrac acompanha o figFrac: cheio quando há
+     espaço, estreita (centralizada) quando aperta. Figuras PORTRAIT já são
+     limitadas pela altura (teto), então ficam na largura cheia. */
+  const baseW = (fit.figFrac || 0.88);
+  const widthFrac = portrait ? 1 : Math.max(0.5, Math.min(1, (baseW - 0.4) / 0.48 * 0.55 + 0.45) + (f.principal ? 0.08 : 0));
+  /* Cap de altura para figuras em FLOAT (não bloco): nunca ultrapassar 80%
+     da coluna disponível. Para portrait muito alta, usa largura × aspecto
+     como guia natural, cap absoluto em 80% de availH. */
+  /* TETO EFETIVO:
+     • Float (M/G): cap 80 % da coluna — figura não sangra para o rodapé.
+     • Bloco (C/XG): cap = availH menos espaço para legenda e margens,
+       garantindo que figura + legenda cabem inteiros no pôster. */
+  /* Container hard-limit: em modo BLOCO (C/XG), o div externo também recebe
+     maxHeight = fit.altura — garante que imagem + legenda + margens não
+     ultrapassam o limite da coluna, independente de s ou aspecto. */
+  const blocoLimit = (blocoEff && fit.altura) ? { maxHeight: Math.max(120, fit.altura - 20), overflow: "hidden" } : {};
+  const colWEst = fit.altura ? Math.round(fit.altura * 1.55 * wPct / 100) : 0;
+  const tetoFloat = (fit && fit.altura && !blocoEff)
+    ? Math.min(
+        teto,
+        colWEst && asp ? Math.round(colWEst * Math.min(asp, 2.4)) : teto,
+        Math.round(fit.altura * 0.80)
+      )
+    : teto;
+  const tetoBloco = (fit && fit.altura && blocoEff)
+    ? Math.max(120, fit.altura - legH - Math.round(36 * s))
+    : teto;
+  const tetoEff = blocoEff ? Math.min(teto, tetoBloco) : tetoFloat;
+  const legenda = (vertical) => (
+    <div style={{ padding:`${Math.round(7*s)}px ${Math.round(11*s)}px`, fontSize:13*s, color:C.cinza, lineHeight:1.3, ...(vertical ? { alignSelf:"center", borderLeft:`1px solid ${cor}22` } : {}) }}>
+      <div style={{ display:"flex", gap:6*s, alignItems:"baseline", flexWrap:"wrap" }}>
+        <strong style={{ color:C.azul, whiteSpace:"nowrap" }}>Fig {f.ordem}.</strong>
+        <span style={{ flex:1, minWidth:80*s, fontWeight:f.titulo?700:400, color:f.titulo?C.tinta:C.cinza }}>{f.titulo || f.legenda}</span>
+        {f.principal && <span style={{ fontSize:11*s, fontWeight:800, color:C.ciano, whiteSpace:"nowrap" }}>★ PRINCIPAL</span>}
+      </div>
+      {f.titulo && f.legenda ? <div style={{ marginTop:3*s }}>{f.legenda}</div> : null}
+    </div>
+  );
+  const borda = `2px ${f.principal ? "solid" : "dashed"} ${f.principal ? C.ciano : cor + "55"}`;
+  const fundo = f.principal ? C.cianoClaro : C.papel;
+  /* MUITO ALTA (≥1,8:1): legenda AO LADO — a imagem já é estreita, então pôr a
+     legenda ao lado libera altura sem custar largura útil. Portrait moderado
+     (2:3) fica melhor com legenda EMBAIXO + largura cheia (mais alto). */
+  if (muitoAlta && url) {
+    return (
+      <div data-figkey={figKey} data-fig-ordem={f.ordem != null ? f.ordem : undefined} data-aj-fixed={fixo ? "1" : undefined} style={{ ...css, display:"flex", alignItems:"stretch", border:borda, borderRadius:10, overflow:"hidden", background:fundo }}>
+        <div style={{ background:"#fff", display:"flex", justifyContent:"center", alignItems:"center", flexShrink:0 }}>
+      <img src={url} alt="" onLoad={onImg} style={{ maxHeight:tetoEff, maxWidth:"100%", width:"auto", height:"auto", display:"block" }} />
+        </div>
+        <div style={{ flex:"1 1 34%", minWidth:0, display:"flex" }}>{legenda(true)}</div>
+      </div>
+    );
+  }
+  /* LANDSCAPE / sem imagem: legenda embaixo. maxWidth acompanha o widthFrac E a
+     escala s — assim a escala do empacotador encolhe também a LARGURA (logo a
+     altura) das figuras largas, não só o texto. */
+  return (
+    <div data-figkey={figKey} data-fig-ordem={f.ordem != null ? f.ordem : undefined} data-aj-fixed={fixo ? "1" : undefined} style={{ ...css, marginTop:8, marginBottom:10, breakInside:"avoid", maxWidth:`${Math.min(100, Math.round(widthFrac*s*100))}%`, marginLeft:"auto", marginRight:"auto", border:borda, borderRadius:10, overflow:"hidden", background:fundo }}>
+      <div style={{ background:"#fff", display:"flex", justifyContent:"center" }}>
+        {url
+          ? <img src={url} alt="" onLoad={onImg} style={{ maxWidth:"100%", maxHeight:tetoEff, width:"auto", height:"auto", display:"block" }} />
+          : <div style={{ height:f.principal ? 118 : 80, display:"flex", alignItems:"center", justifyContent:"center", width:"100%" }}><ImageIcon size={f.principal ? 40 : 30} color={cor} /></div>}
+      </div>
+      {legenda(false)}
+    </div>
+  );
+}
+
+/* ===== MODO 2 — PÔSTER COMPLETO (telão apresentação, FIT sem scroll) ===== */
+function PosterCompleto({ t }) {
+  const BW = 720, BH = 1280;
+  const [ref, scale] = useScale(BW);
+  const cor = AREA_COR[t.area] || C.azul;
+  const fotoUrl = t.foto_autores_url || t.foto_autores_dataUrl;
+  const F = figsPorSecao(t);
+  const Sec = ({ titulo, texto, figs }) => (texto || (figs && figs.length)) ? (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ fontSize:22, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, borderBottom:`4px solid ${cor}33`, paddingBottom:6, marginBottom:8 }}>{titulo}</div>
+      {texto && <div style={{ fontSize:19, lineHeight:1.42, color:C.tinta, textAlign:"justify" }}>{texto}</div>}
+      {figs && figs.map((f, i) => <FigPoster key={i} f={f} cor={cor} />)}
+    </div>
+  ) : null;
+  return (
+    <div ref={ref} style={{ width:"100%", aspectRatio:`${BW} / ${BH}`, position:"relative", overflow:"hidden", borderRadius:14, background:"#fff" }}>
+      <div style={{ position:"absolute", top:0, left:0, width:BW, height:BH, transform:`scale(${scale})`, transformOrigin:"top left", boxSizing:"border-box", display:"flex", flexDirection:"column" }}>
+        <div style={{ background:`linear-gradient(135deg, ${C.azul}, ${C.azulEsc})`, color:"#fff", padding:"26px 36px" }}>
+          <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+            <span style={vbadge}>{t.fase}ª FASE</span><span style={vbadge}>{t.desenho}</span><span style={vbadge}>{t.id}</span>
+            <span style={{ ...vbadge, background:cor, borderColor:cor }}>{t.area}</span>
+          </div>
+          <div style={{ fontSize:33, fontWeight:800, lineHeight:1.08, letterSpacing:-0.5 }}>{t.titulo}</div>
+          <div style={{ display:"flex", gap:18, alignItems:"flex-end", justifyContent:"space-between", marginTop:12 }}>
+            <div style={{ fontSize:18, opacity:0.9, lineHeight:1.35, flex:1, minWidth:0 }}>
+              {_autoresStr(t, " · ")}
+              {Number(t.fase) !== 7 && t.orientador ? <><br /><span style={{ opacity:0.8 }}>Orient.: {t.orientador}</span></> : null}
+              {t.afiliacao ? <><br /><span style={{ opacity:0.8, fontStyle:"italic" }}>{t.afiliacao}</span></> : null}
+            </div>
+            {fotoUrl && <div style={{ width:120, height:120, borderRadius:12, overflow:"hidden", flexShrink:0, border:"3px solid rgba(255,255,255,0.45)", background:"#fff" }}><img src={fotoUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/></div>}
+          </div>
+        </div>
+        {_ehResumo8(t) ? (
+          <CorpoAjustavel t={t} style={{ padding:"24px 36px" }}>
+            <Sec titulo="Resumo" texto={t.resumo_completo} />
+          </CorpoAjustavel>
+        ) : (
+        /* fluxo em 2 colunas — texto preenche os vazios; refs no fim do fluxo
+           (ou na faixa ao pé, se o orçamento de espaço estourar) */
+        <CorpoAjustavel t={t} style={{ padding:"22px 36px", columnCount:2, columnGap:26 }} padX={36}
+          refsFluxo={<RefsInline t={t} cor={cor} />}
+          refsBanda={<RefsBanda t={t} cor={cor} colunas={2} pad="7px 36px 9px" />}>
+          {secoesRender(t).secoes.map((s) => <Sec key={s.campo} titulo={s.rotulo} texto={s.texto} figs={s.figs} />)}
+          {secoesRender(t).outras.length > 0 && <Sec titulo="Figuras complementares" figs={secoesRender(t).outras} />}
+        </CorpoAjustavel>
+        )}
+        <div style={{ background:C.papel, borderTop:"1px solid #E3EAF2", padding:"18px 36px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", flex:1 }}>
+            {_palavrasArr(t).map((p) => <span key={p} style={{ fontSize:14, background:"#fff", border:"1px solid #DCE5EE", borderRadius:999, padding:"5px 14px", color:C.cinza }}>{p}</span>)}
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ background:"#fff", padding:7, borderRadius:10, border:`1px solid ${C.cinzaClaro}` }}><QRCode id={t.id} size={78} /></div>
+            <div style={{ fontSize:18, fontWeight:800, color:C.azul, letterSpacing:0.5 }}>SAM · MEDICINA UNIDAVI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== EMPACOTADOR DE COLUNAS BALANCEADAS (pôster landscape FIT) =====
+   Mede cada bloco, particiona em N grupos CONTÍGUOS (preserva ordem de leitura)
+   minimizando a coluna mais alta, e escala fonte+figuras para a mais alta caber
+   na altura disponível. Blocos empilham em colunas flex → SEM vazios internos
+   (que o fluxo CSS deixava sob figuras). */
+function _particiona(hs, k) {
+  const n = hs.length;
+  const pre = [0]; for (let i = 0; i < n; i++) pre.push(pre[i] + hs[i]);
+  const sum = (a, b) => pre[b] - pre[a];
+  if (n <= k) { const c = []; for (let i = 1; i <= n; i++) c.push(i); while (c.length < k) c.push(n); return c; }
+  let best = null;
+  const rec = (start, parts, cuts, maxSo) => {
+    if (parts === 1) { const m = Math.max(maxSo, sum(start, n)); if (!best || m < best.m) best = { m, cuts: [...cuts, n] }; return; }
+    for (let i = start + 1; i <= n - (parts - 1); i++) { const mm = Math.max(maxSo, sum(start, i)); if (best && mm >= best.m) continue; rec(i, parts - 1, [...cuts, i], mm); }
+  };
+  rec(0, k, [], 0);
+  return best.cuts;
+}
+function SecBloco({ titulo, texto, cor }) {
+  const fit = React.useContext(FitContext); const s = fit.s || 1;
+  if (!texto) return null;
+  return (
+    <div style={{ breakInside: "avoid" }}>
+      <div style={{ fontSize: 19 * s, fontWeight: 800, color: cor, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `3px solid ${cor}33`, paddingBottom: 5 * s, marginBottom: 7 * s }}>{titulo}</div>
+      <div style={{ fontSize: 16.5 * s, lineHeight: 1.42, color: C.tinta, textAlign: "justify" }}>{texto}</div>
+    </div>
+  );
+}
+function RefsBloco({ t, cor, max = 6 }) {
+  const fit = React.useContext(FitContext); const s = fit.s || 1;
+  const refs = _refsArr(t); if (!refs.length) return null;
+  const vis = refs.slice(0, max); const resto = refs.length - vis.length;
+  return (
+    <div style={{ breakInside: "avoid" }}>
+      <div style={{ fontSize: 16 * s, fontWeight: 800, color: cor, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `3px solid ${cor}33`, paddingBottom: 5 * s, marginBottom: 7 * s }}>
+        Referências{refs.length > max ? <span style={{ fontWeight: 600, color: C.cinza, textTransform: "none", letterSpacing: 0 }}> · {max} de {refs.length}</span> : null}
+      </div>
+      <ol style={{ margin: 0, paddingLeft: 18 * s }}>
+        {vis.map((l, i) => <li key={i} style={{ fontSize: 12.5 * s, lineHeight: 1.35, color: C.cinza, marginBottom: 4 * s, breakInside: "avoid" }}>{l}</li>)}
+      </ol>
+      {resto > 0 && <div style={{ fontSize: 12 * s, color: C.cinza, marginTop: 5 * s, fontStyle: "italic" }}>+{resto} referência{resto > 1 ? "s" : ""} — lista completa no modo leitura (QR).</div>}
+    </div>
+  );
+}
+function CorpoPacked({ blocos, refsBloco, refsBanda, bw = 1520, ncols = 3, gap = 28, padX = 40, pisoMin = 0.5, figFrac = 0.42 }) {
+  const outerRef = React.useRef(null);
+  const measRef = React.useRef(null);
+  const visRef = React.useRef(null);
+  // largura da coluna DETERMINÍSTICA a partir da largura conhecida do cartão
+  // — não depende de clientWidth de um flex item (que pode colapsar e zerar tudo)
+  const colW = Math.max(180, Math.round((bw - padX * 2 - gap * (ncols - 1)) / ncols));
+  const [availH, setAvailH] = React.useState(600);
+  const [groups, setGroups] = React.useState(null);
+  const [s, setS] = React.useState(0.9);
+  const [estourou, setEstourou] = React.useState(false);
+  const [tick, setTick] = React.useState(0);
+  const ctl = React.useRef({ ultima: "", chave: "" });
+  const all = refsBloco ? [...blocos, { key: "__refs", node: refsBloco }] : blocos;
+  /* altura disponível — robusta: ignora leituras colapsadas (<120) */
+  React.useLayoutEffect(() => {
+    const el = outerRef.current; if (!el) return;
+    const medir = () => { const h = el.clientHeight; if (h > 120) setAvailH((p) => (Math.abs(h - p) > 2 ? h : p)); };
+    medir(); const ro = new ResizeObserver(medir); ro.observe(el);
+    const t1 = setTimeout(medir, 250); const t2 = setTimeout(medir, 800);
+    return () => { ro.disconnect(); clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  /* re-mede quando as imagens terminam de carregar */
+  React.useLayoutEffect(() => {
+    const m = measRef.current; if (!m) return;
+    const bump = () => { const bsig = colW + "|" + all.length; if (ctl.current.bsig !== bsig) { ctl.current.bsig = bsig; ctl.current.bn = 0; } if ((ctl.current.bn || 0) > 100) return; ctl.current.bn = (ctl.current.bn || 0) + 1; setTick((x) => x + 1); };
+    const imgs = Array.from(m.querySelectorAll("img"));
+    imgs.forEach((im) => { if (!im.complete) im.addEventListener("load", bump, { once: true }); });
+    const tid = setTimeout(bump, 1200);
+    return () => { clearTimeout(tid); imgs.forEach((im) => im.removeEventListener("load", bump)); };
+  }, [colW, all.length]);
+  /* PARTIÇÃO — só depende de colW (determinístico), então as colunas SEMPRE
+     montam, mesmo que availH ainda não tenha medido */
+  React.useLayoutEffect(() => {
+    const m = measRef.current; if (!m) return;
+    const kids = [...m.children]; if (kids.length !== all.length) return;
+    const hs = kids.map((k) => k.offsetHeight + 14);
+    const cuts = _particiona(hs, ncols);
+    const g = []; let start = 0; cuts.forEach((c) => { g.push([start, c]); start = c; });
+    const chave = cuts.join(",");
+    if (chave !== ctl.current.chave) {
+      ctl.current.chave = chave; ctl.current.ultima = "";
+      let tallest = 0; start = 0; cuts.forEach((c) => { tallest = Math.max(tallest, hs.slice(start, c).reduce((a, b) => a + b, 0)); start = c; });
+      const est = tallest ? Math.max(pisoMin, Math.min(1.1, (availH - 40) * 0.95 / tallest)) : 0.9;
+      setGroups(g); setS(est); setEstourou(false);
+    }
+  }, [colW, all.length, tick, availH]);
+  /* REALIMENTAÇÃO: lê a altura REAL do outer (clientHeight, layout, imúne ao
+     transform:scale) a cada passo — nunca depende do estado availH (que pode
+     defasar em resize) — e ajusta s até a coluna mais alta caber de fato */
+  React.useLayoutEffect(() => {
+    const el = outerRef.current, row = visRef.current; if (!el || !row || !groups) return;
+    if (ctl.current.bt !== tick || ctl.current.ba !== availH) { ctl.current.bt = tick; ctl.current.ba = availH; ctl.current.budget = 0; ctl.current.estLatch = false; }
+    if ((ctl.current.budget || 0) > 40) return; /* DISJUNTOR anti-loop (ver CorpoRevista) */
+    const clientH = el.clientHeight; if (clientH < 80) return;
+    const maxH = Math.max(...[...row.children].map((c) => c.offsetHeight));
+    const avail = clientH - 8 - (estourou ? 34 : 0);
+    if (maxH > avail + 1) {
+      if (s > pisoMin) { ctl.current.ultima = "shrink"; ctl.current.budget = (ctl.current.budget || 0) + 1; setS((v) => Math.max(pisoMin, Math.round((v - 0.015) * 1000) / 1000)); }
+      else if (!estourou) { ctl.current.estLatch = true; ctl.current.budget = (ctl.current.budget || 0) + 1; setEstourou(true); }
+    } else if (!estourou && avail - maxH > clientH * 0.05 && s < 1.1 && ctl.current.ultima !== "shrink") {
+      ctl.current.ultima = "grow"; ctl.current.budget = (ctl.current.budget || 0) + 1; setS((v) => Math.min(1.1, Math.round((v + 0.012) * 1000) / 1000));
+    } else if (estourou && maxH <= avail && !ctl.current.estLatch) { ctl.current.budget = (ctl.current.budget || 0) + 1; setEstourou(false); }
+  });
+  const blocoStyle = { marginBottom: 12 };
+  return (
+    <>
+      <div ref={outerRef} style={{ flex: 1, minHeight: 0, width: "100%", overflow: "hidden", position: "relative" }}>
+        {/* medidor oculto (escala 1, largura de uma coluna determinística) */}
+        <div ref={measRef} aria-hidden="true" style={{ position: "absolute", visibility: "hidden", pointerEvents: "none", left: -99999, top: 0, width: colW }}>
+          <FitContext.Provider value={{ s: 1, altura: availH, figFrac, semPrioridade: false }}>
+            {all.map((b) => <div key={b.key} style={blocoStyle}>{b.node}</div>)}
+          </FitContext.Provider>
+        </div>
+        {/* fallback visível enquanto a partição não montou — NUNCA corpo em branco */}
+        {!groups && (
+          <div style={{ padding: `18px ${padX}px`, columnCount: ncols, columnGap: gap, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
+            <FitContext.Provider value={{ s: 0.82, altura: availH, figFrac, semPrioridade: false }}>
+              {all.map((b) => <div key={b.key} style={{ breakInside: "avoid", marginBottom: 12 }}>{b.node}</div>)}
+            </FitContext.Provider>
+          </div>
+        )}
+        {groups && (
+          <div ref={visRef} style={{ display: "flex", gap, padding: `18px ${padX}px`, paddingBottom: estourou ? 44 : 18, height: "100%", boxSizing: "border-box", alignItems: "flex-start" }}>
+            <FitContext.Provider value={{ s, altura: (availH - 28), figFrac, semPrioridade: false }}>
+              {groups.map((g, ci) => (
+                <div key={ci} style={{ width: colW, display: "flex", flexDirection: "column" }}>
+                  {all.slice(g[0], g[1]).filter((b) => !(estourou && b.key === "__refs")).map((b) => <div key={b.key} style={blocoStyle}>{b.node}</div>)}
+                </div>
+              ))}
+            </FitContext.Provider>
+          </div>
+        )}
+        {estourou && (
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>{refsBanda}</div>
+        )}
+        {estourou && (
+          <div style={{ position: "absolute", right: 16, bottom: 46, background: "#FFF8E6", border: "1px solid #F0DCA8", color: "#7A5C12", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+            conteúdo completo no celular (QR)
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ===== LAYOUT “REVISTA” — figuras independentes das colunas =====
+   2 super-colunas; dentro de cada seção a figura FLUTUA (float) e o texto
+   REBATE ao lado dela — sem vazios sob figuras. Largura do float conforme o
+   aspecto da imagem: vertical estreita ~30%, vertical ~38%, horizontal ~52%. */
+const RevOptCtx = React.createContext({ shrinks: {} });
+function FigFloat({ f, cor, lado, modo, figKey, aj }) {
+  const fit = React.useContext(FitContext); const s = fit.s || 1;
+  const opt = React.useContext(RevOptCtx);
+  const shrink = (opt.shrinks && opt.shrinks[figKey]) || 0;
+  const url = f.url || f.dataUrl;
+  const [asp, setAsp] = React.useState(null);
+  const muitoAlta = asp != null && asp >= 1.8;
+  const vertical = asp != null && asp > 1.05;
+  const m = Math.round(12 * s);
+  /* modo “bloco” (rebaixado pelo otimizador): centralizado após o texto,
+     mais largo — não há texto ao lado para aproveitar */
+  const bloco = modo === "bloco";
+  /* AJUSTE MANUAL (ajuste_layout, DOC 3): quando presente, SOBREPÕE a
+     heurística por aspecto. Tamanhos DISCRETOS — P/M/G como largura da
+     coluna; XG = faixa cheia (bloco, texto acima/abaixo). Lado E/D
+     explícito. Tamanho fixo NÃO é re-encolhido pelo otimizador de
+     desperdício (marca data-aj-fixed). */
+  const AJ_W = { P: 25, M: 40, G: 55 };
+  const ajLado = aj && aj.lado ? (aj.lado === "esquerda" ? "left" : "right") : null;
+  const xg = !!(aj && aj.tamanho === "XG");
+  const central = !!(aj && aj.tamanho === "C"); /* CENTRAL: 70%, centralizado, sem float, texto acima e abaixo */
+  const livre = !!(aj && aj.secao === "__livre__"); /* LIVRE: solta da seção → bloco próprio sem título (mesmo caminho de C/XG, sem teto por fit.altura) */
+  const ajW = aj && AJ_W[aj.tamanho] != null ? AJ_W[aj.tamanho] : null;
+  /* "Livre" SEM tamanho explícito recebe uma largura FIXA padrão (como C/XG e
+     P/M/G). Largura fixa = estável: o bloco não muda de largura conforme o
+     aspecto da imagem é medido, evitando a realimentação medir→remedir que
+     trava o balanceador (Maximum update depth) em pôsteres de texto curto. */
+  const livreW = (livre && ajW == null && !xg && !central) ? 55 : null;
+  const fixo = xg || central || ajW != null || livreW != null;
+  const blocoEff = bloco || xg || central || livre;
+  const ladoEff = ajLado || lado;
+  let wPct;
+  if (xg) wPct = 100;
+  else if (central) wPct = 70;
+  else if (ajW != null) wPct = ajW;
+  else if (livreW != null) wPct = livreW;
+  else { const base = blocoEff ? (muitoAlta ? 38 : vertical ? 52 : 74) : (muitoAlta ? 30 : vertical ? 40 : 54); wPct = Math.max(24, base - (blocoEff ? 0 : shrink * 9)); }
+  const css = blocoEff
+    ? { clear: "both", width: `${wPct}%`, margin: `${m}px auto` }
+    : { float: ladoEff, clear: "both", width: `${wPct}%`, margin: ladoEff === "right" ? `4px 0 ${m}px ${m}px` : `4px ${m}px ${m}px 0` };
+  return (
+    <div data-figkey={figKey} data-fig-ordem={f.ordem != null ? f.ordem : undefined} data-aj-fixed={fixo ? "1" : undefined} style={{ ...css, border: `2px ${f.principal ? "solid" : "dashed"} ${f.principal ? C.ciano : cor + "55"}`, borderRadius: 10, overflow: "hidden", background: f.principal ? C.cianoClaro : C.papel }}>
+      <div style={{ background: "#fff", display: "flex", justifyContent: "center" }}>
+        {url
+          ? <img src={url} alt="" onLoad={(e) => { const im = e.currentTarget; if (im.naturalWidth) setAsp(im.naturalHeight / im.naturalWidth); }} style={ (fit && fit.altura && (xg || !blocoEff)) ? { maxHeight: Math.max(150, Math.round(fit.altura - (xg ? 60 : 90))), maxWidth: "100%", width: "auto", height: "auto", display: "block", margin: "0 auto" } : { width: "100%", height: "auto", display: "block" }} />
+          : <div style={{ height: 84, display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}><ImageIcon size={30} color={cor} /></div>}
+      </div>
+      <div style={{ padding: `${Math.round(6 * s)}px ${Math.round(10 * s)}px`, fontSize: 12.5 * s, color: C.cinza, lineHeight: 1.3 }}>
+        <strong style={{ color: C.azul }}>Fig {f.ordem}.</strong>{" "}
+        <span style={{ fontWeight: f.titulo ? 700 : 400, color: f.titulo ? C.tinta : C.cinza }}>{f.titulo || f.legenda}</span>
+        {f.principal && <span style={{ fontSize: 10.5 * s, fontWeight: 800, color: C.ciano, marginLeft: 6, whiteSpace: "nowrap" }}>★ PRINCIPAL</span>}
+        {f.titulo && f.legenda ? <div style={{ marginTop: 2 }}>{f.legenda}</div> : null}
+      </div>
+    </div>
+  );
+}
+function SecRevista({ secKey, titulo, texto, figs, cor, ajustes }) {
+  const fit = React.useContext(FitContext); const s = fit.s || 1;
+  /* SEM BFC próprio: o texto da PRÓXIMA seção também rebate ao lado de uma
+     figura que sobrou — o fluxo da coluna é contínuo (sem buracos ao lado de
+     floats). Título em flow-root para encolher ao lado do float (a borda não
+     atravessa a figura). A detecção de desperdício subiu para a COLUNA. */
+  if (!texto && !(figs && figs.length)) return null;
+  return (
+    <div>
+      {titulo ? <div style={{ display: "flow-root", clear: "both", fontSize: 19 * s, fontWeight: 800, color: cor, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `3px solid ${cor}33`, paddingBottom: 5 * s, marginBottom: 7 * s }}>{titulo}</div> : null}
+      <div style={{ fontSize: 16.5 * s, lineHeight: 1.45, color: C.tinta, textAlign: "justify" }}>
+        {(figs || []).map((f, i) => <FigFloat key={"fl" + i} f={f} cor={cor} lado={i % 2 ? "left" : "right"} figKey={secKey + ":" + i} aj={ajustes && ajustes.figuras ? ajustes.figuras[f.__ajKey != null ? f.__ajKey : (titulo + ":" + i)] : null} />)}
+        {texto}
+      </div>
+    </div>
+  );
+}
+function CorpoRevista({ secoes, refsBloco, refsBanda, bw = 1520, gap = 36, padX = 40, pisoMin = 0.5, colunas = 2, ajustes }) {
+  const outerRef = React.useRef(null);
+  const measRef = React.useRef(null);
+  const visRef = React.useRef(null);
+  const COLS = colunas === 3 ? 3 : 2;
+  const superW = Math.max(280, Math.round((bw - padX * 2 - gap * (COLS - 1)) / COLS));
+  const [availH, setAvailH] = React.useState(600);
+  const [groups, setGroups] = React.useState(null);
+  const [s, setS] = React.useState(0.9);
+  const [estourou, setEstourou] = React.useState(false);
+  const [tick, setTick] = React.useState(0);
+  const [shrinksRev, setShrinksRev] = React.useState({});
+  const ctl = React.useRef({ ultima: "", chave: "" });
+  /* XG = figura de LARGURA CHEIA: vira BLOCO PRÓPRIO no empacotador, para o
+     título+texto da seção poderem ir para outra coluna (preenchendo o vazio e
+     autoajustando a fonte) em vez de serem espremidos/suprimidos pela figura. */
+  const _ehXGouC = (f) => { const a = ajustes && ajustes.figuras ? ajustes.figuras[f.__ajKey] : null; return !!(a && (a.tamanho === "XG" || a.tamanho === "C" || a.secao === "__livre__")); };
+  const secoesXG = [], _xgBlocks = [];
+  (secoes || []).forEach((sx) => {
+    if (sx.node) { secoesXG.push(sx); return; }
+    const figs0 = sx.figs || [];
+    const xg = figs0.filter(_ehXGouC);
+    if (xg.length) {
+      secoesXG.push({ ...sx, figs: figs0.filter((f) => !_ehXGouC(f)) }); // título+texto+figs não-XG/C ficam
+      xg.forEach((f, k) => _xgBlocks.push({ key: sx.key + "-xgc" + k, titulo: "", texto: "", figs: [f], cor: sx.cor, colBreak: true }));
+    } else { secoesXG.push(sx); } // sem XG/C: bloco normal
+  });
+  secoesXG.push(..._xgBlocks);   // figura(s) XG (resumo) vão para o FIM → ocupam coluna própria
+  const all = refsBloco ? [...secoesXG, { key: "__refs", node: refsBloco }] : secoesXG;
+  React.useLayoutEffect(() => {
+    const el = outerRef.current; if (!el) return;
+    const medir = () => { const h = el.clientHeight; if (h > 120) setAvailH((p) => (Math.abs(h - p) > 2 ? h : p)); };
+    medir(); const ro = new ResizeObserver(medir); ro.observe(el);
+    const t1 = setTimeout(medir, 250); const t2 = setTimeout(medir, 800);
+    return () => { ro.disconnect(); clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  React.useLayoutEffect(() => {
+    const m = measRef.current; if (!m) return;
+    const bump = () => { const bsig = superW + "|" + all.length; if (ctl.current.bsig !== bsig) { ctl.current.bsig = bsig; ctl.current.bn = 0; } if ((ctl.current.bn || 0) > 100) return; ctl.current.bn = (ctl.current.bn || 0) + 1; setTick((x) => x + 1); };
+    const imgs = Array.from(m.querySelectorAll("img"));
+    const vis = visRef.current ? Array.from(visRef.current.querySelectorAll("img")) : [];
+    [...imgs, ...vis].forEach((im) => { if (!im.complete) im.addEventListener("load", bump, { once: true }); });
+    const tid = setTimeout(bump, 1200);
+    /* watchdog: qualquer reflow nas colunas visíveis (imagem que chegou,
+       shrink de float…) re-dispara a realimentação — sem isto o laço para
+       de rodar e um overflow tardio fica sem correção */
+    let ro = null;
+    if (visRef.current) { ro = new ResizeObserver(bump); [...visRef.current.children].forEach((c) => ro.observe(c)); }
+    return () => { clearTimeout(tid); ro && ro.disconnect(); [...imgs, ...vis].forEach((im) => im.removeEventListener("load", bump)); };
+  }, [superW, all.length, groups]);
+  React.useLayoutEffect(() => {
+    const m = measRef.current; if (!m) return;
+    const kids = [...m.children]; if (kids.length !== all.length) return;
+    const hs = kids.map((k) => k.offsetHeight + 16);
+    /* colBreak: blocos XG/C forçam início de nova coluna — move o corte
+       para imediatamente antes deles, garantindo que o texto anterior
+       preencha col 1 e a figura ocupe o topo de col 2. */
+    const colBreakIdxs = all.map((b, i) => (b.colBreak ? i : -1)).filter((i) => i >= 0);
+    let cuts = _particiona(hs, COLS);
+    if (colBreakIdxs.length) {
+      cuts = [...cuts];
+      colBreakIdxs.forEach((idx) => {
+        /* força o bloco colBreak a INICIAR uma nova coluna:
+           encontra em qual partição idx cai e move o corte ANTERIOR
+           para idx, empurrando tudo antes para a coluna precedente. */
+        let prev = 0;
+        for (let ci = 0; ci < COLS; ci++) {
+          if (idx > prev && idx <= cuts[ci]) {
+            if (ci > 0) cuts[ci - 1] = idx; /* corte anterior = início do bloco */
+            break;
+          }
+          prev = cuts[ci];
+        }
+      });
+    }
+    const g = []; let start = 0; cuts.forEach((c) => { g.push([start, c]); start = c; });
+    const chave = cuts.join(",");
+    if (chave !== ctl.current.chave) {
+      ctl.current.chave = chave; ctl.current.ultima = "";
+      let tallest = 0; start = 0; cuts.forEach((c) => { tallest = Math.max(tallest, hs.slice(start, c).reduce((a, b) => a + b, 0)); start = c; });
+      const est = tallest ? Math.max(pisoMin, Math.min(1.1, (availH - 40) * 0.95 / tallest)) : 0.9;
+      setGroups(g); setS(est); setEstourou(false);
+    }
+  }, [superW, all.length, tick, availH]);
+  React.useLayoutEffect(() => {
+    const el = outerRef.current, row = visRef.current; if (!el || !row || !groups) return;
+    /* DISJUNTOR anti-loop: só a CADEIA SÍNCRONA de ajustes (s/estourou) conta
+       para o orçamento; disparos EXTERNOS (tick/availH) o zeram. Assim o efeito
+       congela ANTES do teto do React, eliminando "Maximum update depth
+       exceeded" sem penalizar a convergência normal. estLatch impede o
+       liga/desliga de `estourou` (que some/mostra as refs e muda o maxH). */
+    if (ctl.current.bt !== tick || ctl.current.ba !== availH) { ctl.current.bt = tick; ctl.current.ba = availH; ctl.current.budget = 0; ctl.current.estLatch = false; }
+    if ((ctl.current.budget || 0) > 40) return;
+    const clientH = el.clientHeight; if (clientH < 80) return;
+    const maxH = Math.max(...[...row.children].map((c) => c.offsetHeight));
+    const avail = clientH - 8 - (estourou ? 34 : 0);
+    if (maxH > avail + 1) {
+      if (s > pisoMin) { ctl.current.ultima = "shrink"; ctl.current.budget = (ctl.current.budget || 0) + 1; setS((v) => Math.max(pisoMin, Math.round((v - 0.015) * 1000) / 1000)); }
+      else if (!estourou) { ctl.current.estLatch = true; ctl.current.budget = (ctl.current.budget || 0) + 1; setEstourou(true); }
+    } else if (!estourou && avail - maxH > clientH * (ctl.current.ultima === "shrink" ? 0.12 : 0.05) && s < 1.1) {
+      ctl.current.ultima = "grow"; ctl.current.budget = (ctl.current.budget || 0) + 1; setS((v) => Math.min(1.1, Math.round((v + 0.012) * 1000) / 1000));
+    } else if (estourou && maxH <= avail && !ctl.current.estLatch) { ctl.current.budget = (ctl.current.budget || 0) + 1; setEstourou(false); }
+  }, [s, groups, estourou, tick, availH]);
+  /* OTIMIZADOR de desperdício — nível de COLUNA: se um float desce além do
+     fim do conteúdo da coluna em mais de 45% da própria altura (nem a seção
+     seguinte preencheu ao lado), ESTREITA esse float em passos. Monotônico. */
+  React.useLayoutEffect(() => {
+    const row = visRef.current; if (!row || !groups) return;
+    let alvo = null, maior = 0;
+    [...row.children].forEach((col) => {
+      const kids = [...col.children].filter((k) => !k.hasAttribute("data-figkey"));
+      if (!kids.length) return;
+      const fimConteudo = Math.max(...kids.map((k) => k.offsetTop + k.offsetHeight));
+      col.querySelectorAll("[data-figkey]").forEach((el) => {
+        if (getComputedStyle(el).float === "none") return;
+        if (el.getAttribute("data-aj-fixed")) return;
+        const key = el.getAttribute("data-figkey");
+        if ((shrinksRev[key] || 0) >= 2) return;
+        const waste = el.offsetTop + el.offsetHeight - fimConteudo;
+        if (waste > el.offsetHeight * 0.45 && waste > maior) { maior = waste; alvo = key; }
+      });
+    });
+    if (alvo) setShrinksRev((d) => ({ ...d, [alvo]: (d[alvo] || 0) + 1 }));
+  }, [s, groups, tick, estourou, shrinksRev]);
+  const blocoStyle = { marginBottom: 14 };
+  const measStyle = { marginBottom: 14, display: "flow-root" /* mede INCLUINDO o float */ };
+  const render = (b) => {
+    const node = b.node ? b.node : <SecRevista secKey={b.key} titulo={b.titulo} texto={b.texto} figs={b.figs} cor={b.cor} ajustes={ajustes} />;
+    if (b.colBreak && availH > 0) return <div style={{ maxHeight: Math.max(80, availH - 20), overflow: "hidden" }}>{node}</div>;
+    return node;
+  };
+  return (
+    <div ref={outerRef} style={{ flex: 1, minHeight: 0, width: "100%", overflow: "hidden", position: "relative" }}>
+      <RevOptCtx.Provider value={{ shrinks: shrinksRev }}>
+      <div ref={measRef} aria-hidden="true" style={{ position: "absolute", visibility: "hidden", pointerEvents: "none", left: -99999, top: 0, width: superW }}>
+        <FitContext.Provider value={{ s: 1, altura: availH, figFrac: 0.5, semPrioridade: false }}>
+          {all.map((b) => <div key={b.key} style={measStyle}>{render(b)}</div>)}
+        </FitContext.Provider>
+      </div>
+      {!groups && (
+        <div style={{ padding: `18px ${padX}px`, display: "flex", gap, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
+          <FitContext.Provider value={{ s: 0.82, altura: availH, figFrac: 0.5, semPrioridade: false }}>
+            {Array.from({ length: COLS }).map((_, ci) => (
+              <div key={ci} style={{ width: superW }}>{all.slice(Math.floor(all.length * ci / COLS), Math.floor(all.length * (ci + 1) / COLS)).map((b) => <div key={b.key} style={blocoStyle}>{render(b)}</div>)}</div>
+            ))}
+          </FitContext.Provider>
+        </div>
+      )}
+      {groups && (
+        <div ref={visRef} style={{ display: "flex", gap, padding: `18px ${padX}px`, paddingBottom: estourou ? 44 : 18, height: "100%", boxSizing: "border-box", alignItems: "flex-start" }}>
+          <FitContext.Provider value={{ s, altura: (availH - 28), figFrac: 0.5, semPrioridade: false }}>
+            {groups.map((g, ci) => (
+              <div key={ci} style={{ width: superW, display: "flow-root", position: "relative" /* fluxo CONTÍNUO: floats de uma seção recebem o texto da seguinte */ }}>
+                {all.slice(g[0], g[1]).filter((b) => !(estourou && b.key === "__refs")).map((b) => <div key={b.key} style={blocoStyle}>{render(b)}</div>)}
+              </div>
+            ))}
+          </FitContext.Provider>
+        </div>
+      )}
+      </RevOptCtx.Provider>
+      {estourou && <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>{refsBanda}</div>}
+      {estourou && (
+        <div style={{ position: "absolute", right: 16, bottom: 46, background: "#FFF8E6", border: "1px solid #F0DCA8", color: "#7A5C12", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+          conteúdo completo no celular (QR)
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===== MODO 2b — PÔSTER COMPLETO HORIZONTAL (monitor / TV deitada, FIT total sem scroll) ===== */
+function PosterCompletoLandscape({ t, onVoltar }) {
+  const BW = 1600;
+  const [ref, scale, BH] = useFillViewport(BW);
+  const cor = AREA_COR[t.area] || C.azul;
+  const fotoUrl = t.foto_autores_url || t.foto_autores_dataUrl;
+  const F = figsPorSecao(t);
+  const fase7 = Number(t.fase) === 7;
+  const Sec = ({ titulo, texto, figs }) => (texto || (figs && figs.length)) ? (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ fontSize:19, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, borderBottom:`3px solid ${cor}33`, paddingBottom:5, marginBottom:7, breakAfter:"avoid" }}>{titulo}</div>
+      {texto && <div style={{ fontSize:16.5, lineHeight:1.42, color:C.tinta, textAlign:"justify" }}>{texto}</div>}
+      {figs && figs.map((f, i) => <FigPoster key={i} f={f} cor={cor} />)}
+    </div>
+  ) : null;
+  // fluxo em colunas balanceadas: o texto escorre e preenche os espaços
+  const complementares = fase7 ? [...F.conclusao, ...F.outras] : F.outras;
+  return (
+    <div ref={ref} style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+      <div style={{ width:BW, height:BH, transform:`scale(${scale})`, transformOrigin:"center center", flexShrink:0, background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.45)", display:"flex", flexDirection:"column", boxSizing:"border-box" }}>
+        {/* cabeçalho — concentra TUDO que não é conteúdo: badges, palavras-chave,
+            marca, voltar, foto e QR — o corpo fica inteiro para o trabalho */}
+        <div style={{ background:`linear-gradient(135deg, ${C.azul}, ${C.azulEsc})`, color:"#fff", padding:"11px 40px", display:"flex", gap:18, alignItems:"center" }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ display:"flex", gap:6, marginBottom:6, flexWrap:"wrap", alignItems:"center" }}>
+              {onVoltar && (
+                <button onClick={onVoltar} title="Voltar à programação" style={{ ...vbadgeSm, display:"inline-flex", alignItems:"center", gap:5, cursor:"pointer", fontFamily:"inherit", background:"rgba(255,255,255,0.26)", color:"#fff" }}>
+                  <ArrowLeft size={13} color="#fff" /> Voltar
+                </button>
+              )}
+              <span style={vbadgeSm}>{t.fase}ª FASE</span><span style={vbadgeSm}>{t.desenho}</span><span style={vbadgeSm}>{t.id}</span>
+              <span style={{ ...vbadgeSm, background:cor, borderColor:cor }}>{t.area}</span>
+              {_palavrasArr(t).map((p) => <span key={p} style={{ fontSize:12, fontWeight:600, padding:"3px 10px", borderRadius:999, border:"1px solid rgba(255,255,255,0.28)", color:"rgba(255,255,255,0.85)", whiteSpace:"nowrap" }}>{p}</span>)}
+              <span style={{ marginLeft:"auto", fontSize:13, fontWeight:800, letterSpacing:0.6, color:C.ciano, whiteSpace:"nowrap" }}>SAM · MEDICINA UNIDAVI</span>
+            </div>
+            <div style={{ fontSize:23, fontWeight:800, lineHeight:1.12, letterSpacing:-0.3 }}>{t.titulo}</div>
+            <div style={{ fontSize:12.5, opacity:0.9, lineHeight:1.3, marginTop:5 }}>
+              {_autoresStr(t, " · ")}
+              {!fase7 && t.orientador ? <span style={{ opacity:0.8 }}> · Orient.: {t.orientador}</span> : null}
+              {t.afiliacao ? <span style={{ opacity:0.72, fontStyle:"italic" }}> — {t.afiliacao}</span> : null}
+            </div>
+          </div>
+          {fotoUrl && <div style={{ width:62, height:62, borderRadius:10, overflow:"hidden", flexShrink:0, border:"2px solid rgba(255,255,255,0.45)", background:"#fff" }}><img src={fotoUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/></div>}
+          <div style={{ background:"#fff", padding:5, borderRadius:8, flexShrink:0 }}><QRCode id={t.id} size={62} /></div>
+        </div>
+        {/* corpo — fluxo em 3 colunas; referências no fim do texto.
+            Pisos de legibilidade para TV 65" a ~1,5 m: texto ≥ 0,85 (mínimo
+            absoluto 0,75) — abaixo disso, sinaliza e manda para o QR. */}
+        {_ehResumo8(t) ? (
+          <CorpoAjustavel t={t} style={{ padding:"22px 40px", columnCount:2, columnGap:36 }} padX={40} pisoTexto={0.85} pisoMin={0.75}>
+            <Sec titulo="Resumo" texto={t.resumo_completo} />
+          </CorpoAjustavel>
+        ) : (() => {
+          /* layout “revista”: 2 super-colunas; figuras flutuam DENTRO das seções
+             e o texto rebate ao lado delas (sem vazios sob figuras) */
+          const aj = parseAjuste(t);
+          const _ajK = _ajKeyPorOrdem(t);
+          /* aplica override de SEÇÃO por figura (ajuste manual da curadoria): a
+             chave (__ajKey) continua ancorada na seção ORIGINAL da submissão
+             (estável), mas a figura é re-bucketada na seção escolhida. */
+          const _tEff = { ...t, figuras: figsOrdenadas(t).map((f) => { const o = (aj && aj.figuras) ? aj.figuras[_ajK[f.ordem]] : null; return { ...f, secao: (o && o.secao && o.secao !== "__livre__") ? o.secao : f.secao, __ajKey: _ajK[f.ordem] }; }) };
+          const { secoes: SR, outras: SRoutras } = secoesRender(_tEff);
+          const secoes = [];
+          SR.forEach((s) => { if (s.texto || (s.figs && s.figs.length)) secoes.push({ key: "s-" + s.campo, titulo: s.rotulo, texto: s.texto, figs: s.figs, cor }); });
+          if (SRoutras.length) {
+            const ult = secoes[secoes.length - 1];
+            if (ult) ult.figs = [...ult.figs, ...SRoutras]; else secoes.push({ key: "s-figs", titulo: "Figuras", texto: "", figs: SRoutras, cor });
+          }
+          return (
+            <CorpoRevista secoes={secoes} bw={BW} gap={36} padX={40} pisoMin={0.5}
+              colunas={aj && aj.colunas === 3 ? 3 : 2} ajustes={aj}
+              refsBloco={<RefsBloco t={t} cor={cor} />} />
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+/* Referências começam ABERTAS por padrão; só recolhidas se >8 (espaço). */
+const REFS_MAX_ABERTO = 8;
+
+/* ===== MODO 3 — LEITURA (celular via QR, fluxo ROLÁVEL) ===== */
+function RefsLeitura({ t, cor }) {
+  const refs = _refsArr(t);
+  /* início ABERTO; recolhido (com contador) só quando há mais de 8 referências */
+  const [aberto, setAberto] = React.useState(refs.length > 0 && refs.length <= REFS_MAX_ABERTO);
+  if (!refs.length) return null;
+  return (
+    <div style={{ marginBottom:22, border:"1px solid #E3EAF2", borderRadius:11 }}>
+      <button onClick={() => setAberto((a) => !a)} style={{ width:"100%", display:"flex", alignItems:"center", gap:8, border:"none", background:"transparent", cursor:"pointer", padding:"12px 14px", fontFamily:"inherit", textAlign:"left" }}>
+        <span style={{ fontSize:13, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.6 }}>Referências</span>
+        <span style={{ fontSize:12, color:C.cinza }}>({refs.length})</span>
+        <span style={{ marginLeft:"auto", fontSize:12, color:C.cinza }}>{aberto ? "recolher ▴" : "abrir ▾"}</span>
+      </button>
+      {aberto && <ol style={{ margin:0, padding:"0 14px 14px 32px" }}>{refs.map((l, i) => <li key={i} style={{ fontSize:13, lineHeight:1.5, color:C.cinza, marginBottom:6 }}>{l}</li>)}</ol>}
+    </div>
+  );
+}
+/* ===== MATERIAL SUPLEMENTAR (podcast · quiz · flashcards) =====
+   Lido de t.material = { audioUrl, quiz, flashcardsText }. Cada recurso é
+   OPCIONAL — só renderiza a aba do que existir. quiz já vem ESTRUTURADO
+   (array de questões { pergunta, alternativas:[4], correta:0..3, explicacao });
+   flashcardsText é CSV padrão (vírgula separadora, aspas duplas). */
+const _matNavBtn = { display:"inline-flex", alignItems:"center", gap:6, border:"1px solid #E3EAF2", background:"#fff", color:C.azul, borderRadius:9, padding:"11px 16px", fontSize:13.5, fontWeight:700, cursor:"pointer", fontFamily:"inherit" };
+/* CSV padrão: vírgula separadora; campos com vírgula/quebra entre aspas duplas;
+   "" representa uma aspa literal dentro de campo citado. Sem cabeçalho. */
+/* Player do podcast. Links de DOWNLOAD do Google Drive não fazem streaming
+   dentro de <audio> (sem suporte a Range), então para arquivos do Drive usamos
+   o player de PREVIEW oficial num iframe — que toca inline de forma confiável.
+   Sempre oferece um link de download como reserva. URLs não-Drive: <audio>. */
+function _driveId(url) {
+  const s = String(url || "");
+  const m = s.match(/[?&]id=([a-zA-Z0-9_-]+)/) || s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || s.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+function AudioMaterial({ src, cor }) {
+  const [falhou, setFalhou] = React.useState(false);
+  const id = _driveId(src);
+  const baixar = (
+    <a href={src} target="_blank" rel="noopener noreferrer"
+      style={{ alignSelf:"flex-start", display:"inline-flex", alignItems:"center", gap:6, fontSize:12.5, fontWeight:600, color:C.azul, textDecoration:"none" }}>
+      <Headphones size={13} color={C.azul} /> Abrir em nova aba / baixar
+    </a>
+  );
+  if (id) {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ borderRadius:12, overflow:"hidden", border:"1px solid #E3EAF2", background:"#F2F5F9" }}>
+          <iframe src={`https://drive.google.com/file/d/${id}/preview`} title="Podcast" allow="autoplay"
+            style={{ width:"100%", height:80, border:"none", display:"block" }} />
+        </div>
+        {baixar}
+      </div>
+    );
+  }
+  if (falhou) {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ fontSize:13, color:C.cinza, lineHeight:1.5 }}>Não foi possível tocar o áudio aqui. Abra o arquivo para ouvir ou baixar.</div>
+        <a href={src} target="_blank" rel="noopener noreferrer"
+          style={{ display:"inline-flex", alignItems:"center", gap:8, textDecoration:"none", background:cor || C.azul, color:"#fff", borderRadius:10, padding:"11px 16px", fontSize:13.5, fontWeight:700 }}>
+          <Headphones size={16} color="#fff" /> Abrir / baixar o podcast
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      <audio controls src={src} style={{ width:"100%" }} onError={() => setFalhou(true)} />
+      {baixar}
+    </div>
+  );
+}
+/* Slides da apresentação (PDF / Google Slides). Mesmo padrão do podcast:
+   se for arquivo do Drive, embute o preview oficial; sempre oferece abrir/baixar. */
+function SlidesMaterial({ src, cor }) {
+  const s = String(src || "");
+  const mSlides = s.match(/presentation\/d\/([a-zA-Z0-9_-]+)/);
+  const id = _driveId(src);
+  const embed = mSlides ? `https://docs.google.com/presentation/d/${mSlides[1]}/embed`
+              : id ? `https://drive.google.com/file/d/${id}/preview` : null;
+  const abrir = (
+    <a href={src} target="_blank" rel="noopener noreferrer"
+      style={{ alignSelf:"flex-start", display:"inline-flex", alignItems:"center", gap:6, fontSize:12.5, fontWeight:600, color:C.azul, textDecoration:"none" }}>
+      <Presentation size={13} color={C.azul} /> Abrir em nova aba / baixar
+    </a>
+  );
+  if (embed) {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ borderRadius:12, overflow:"hidden", border:"1px solid #E3EAF2", background:"#F2F5F9", aspectRatio:"16 / 9" }}>
+          <iframe src={embed} title="Slides" allow="autoplay" allowFullScreen
+            style={{ width:"100%", height:"100%", border:"none", display:"block" }} />
+        </div>
+        {abrir}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      <a href={src} target="_blank" rel="noopener noreferrer"
+        style={{ display:"inline-flex", alignSelf:"flex-start", alignItems:"center", gap:8, textDecoration:"none", background:cor || C.azul, color:"#fff", borderRadius:10, padding:"11px 16px", fontSize:13.5, fontWeight:700 }}>
+        <Presentation size={16} color="#fff" /> Abrir os slides
+      </a>
+    </div>
+  );
+}
+function parseCSV(texto) {
+  const linhas = []; let campo = "", linha = [], emAspas = false;
+  const s = String(texto || "");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (emAspas) {
+      if (c === '"') { if (s[i + 1] === '"') { campo += '"'; i++; } else emAspas = false; }
+      else campo += c;
+    } else if (c === '"') emAspas = true;
+    else if (c === ",") { linha.push(campo); campo = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && s[i + 1] === "\n") i++; linha.push(campo); linhas.push(linha); linha = []; campo = ""; }
+    else campo += c;
+  }
+  if (campo.length || linha.length) { linha.push(campo); linhas.push(linha); }
+  return linhas.filter((l) => l.some((x) => x.trim() !== ""));
+}
+function parseFlashcards(csv) {
+  return parseCSV(csv)
+    .map((cols) => ({ frente: (cols[0] || "").trim(), verso: (cols[1] || "").trim() }))
+    .filter((c) => c.frente);
+}
+/* ===== MathText: renderiza texto com fórmulas LaTeX inline/bloco ($...$, $$...$$)
+   Material (flashcards/quiz) do NotebookLM vem com notação LaTeX. KaTeX (CDN)
+   converte cada trecho entre $; o resto segue como texto normal. Se o KaTeX
+   ainda não carregou, faz um fallback legível trocando os comandos comuns. */
+function _texParaTexto(t) {
+  return String(t)
+    .replace(/\\(ge|geq)\b/g, "\u2265").replace(/\\(le|leq)\b/g, "\u2264")
+    .replace(/\\neq?\b/g, "\u2260").replace(/\\times\b/g, "\u00d7").replace(/\\cdot\b/g, "\u00b7")
+    .replace(/\\div\b/g, "\u00f7").replace(/\\pm\b/g, "\u00b1").replace(/\\approx\b/g, "\u2248")
+    .replace(/\\(mu|micro)\b/g, "\u00b5").replace(/\\alpha\b/g, "\u03b1").replace(/\\beta\b/g, "\u03b2")
+    .replace(/\\Delta\b/g, "\u0394").replace(/\\delta\b/g, "\u03b4").replace(/\\degree\b/g, "\u00b0")
+    .replace(/\\text\{([^}]*)\}/g, "$1").replace(/\\mathrm\{([^}]*)\}/g, "$1")
+    .replace(/\\[,;: ]/g, " ").replace(/\\%/g, "%").replace(/[{}]/g, "").replace(/\\\\/g, " ").trim();
+}
+function useKatexPronto() {
+  const [, forcar] = React.useState(0);
+  React.useEffect(() => {
+    if (typeof window === "undefined" || window.katex) return;
+    const iv = setInterval(() => { if (window.katex) { clearInterval(iv); forcar((n) => n + 1); } }, 150);
+    return () => clearInterval(iv);
+  }, []);
+}
+function MathText({ children }) {
+  const str = children == null ? "" : String(children);
+  if (!str || str.indexOf("$") === -1) return str;
+  const partes = [];
+  const re = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g;
+  let ult = 0, m;
+  while ((m = re.exec(str))) {
+    if (m.index > ult) partes.push(str.slice(ult, m.index));
+    partes.push({ tex: m[1] != null ? m[1] : m[2], bloco: m[1] != null });
+    ult = re.lastIndex;
+  }
+  if (ult < str.length) partes.push(str.slice(ult));
+  if (!partes.some((p) => typeof p !== "string")) return str;
+  return partes.map((p, k) => {
+    if (typeof p === "string") return <React.Fragment key={k}>{p}</React.Fragment>;
+    if (typeof window !== "undefined" && window.katex) {
+      try {
+        const html = window.katex.renderToString(p.tex, { throwOnError: false, displayMode: p.bloco });
+        return <span key={k} dangerouslySetInnerHTML={{ __html: html }} />;
+      } catch (e) {}
+    }
+    return <React.Fragment key={k}>{_texParaTexto(p.tex)}</React.Fragment>;
+  });
+}
+/* ===== FLASHCARDS — modo estudo leve e gamificado =====
+   Tudo STATELESS (só useState; some ao recarregar). Embaralha ao abrir;
+   "Lembrei" tira o card; "Não lembrei" manda pra repescagem. Quando a pilha
+   acaba, abre automaticamente a rodada de revisão só com os que faltaram
+   (re-embaralhados), repetindo até zerar. Sem login/persistência. */
+const _fcEmbaralha = (arr) => {
+  const a = arr.slice();
+  for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); const tmp = a[k]; a[k] = a[j]; a[j] = tmp; }
+  return a;
+};
+const _fcVerde = "#1F8A5B", _fcVermelho = "#C0392B";
+const _fcEstiloFlip = `
+  .fcs-carta{ border:1px solid #E3EAF2; border-radius:16px; padding:32px 22px; min-height:208px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    cursor:pointer; transform-origin:center; -webkit-tap-highlight-color:transparent;
+    transition:transform .18s ease, background .18s ease; }
+  .fcs-carta.fcs-squish{ transform:scaleX(0); }
+  @media (prefers-reduced-motion: reduce){ .fcs-carta{ transition:background .18s ease; } .fcs-carta.fcs-squish{ transform:none; } }
+`;
+function Flashcards({ cards }) {
+  useKatexPronto();
+  const total = cards.length;
+  const baralhoBase = React.useMemo(() => cards.map((c, _i) => ({ ...c, _i })), [cards]);
+  const novaSessao = React.useCallback(() => ({
+    fila: _fcEmbaralha(baralhoBase), idx: 0, virado: false, animando: false,
+    repescagem: [], rodada: 1, falharam: {}, fim: false,
+  }), [baralhoBase]);
+  const [s, setS] = React.useState(novaSessao);
+  const { fila, idx, virado, animando, repescagem, rodada, falharam, fim } = s;
+  const card = fila[idx];
+  const flipTimer = React.useRef(0);
+  React.useEffect(() => () => clearTimeout(flipTimer.current), []);
+
+  const responder = (lembrou) => {
+    if (animando) return;
+    const atual = fila[idx];
+    const novaRep = lembrou ? repescagem : repescagem.concat([atual]);
+    const novosFalharam = lembrou ? falharam : { ...falharam, [atual._i]: true };
+    if (idx + 1 < fila.length) {
+      setS({ ...s, idx: idx + 1, virado: false, repescagem: novaRep, falharam: novosFalharam });
+    } else if (novaRep.length === 0) {
+      setS({ ...s, virado: false, repescagem: [], falharam: novosFalharam, fim: true });
+    } else {
+      setS({ ...s, fila: _fcEmbaralha(novaRep), idx: 0, virado: false, repescagem: [], rodada: rodada + 1, falharam: novosFalharam });
+    }
+  };
+
+  if (fim) {
+    const reviram = Object.keys(falharam).length;
+    const primeira = total - reviram;
+    return (
+      <div style={{ textAlign:"center", padding:"22px 16px" }}>
+        <div style={{ fontSize:12, fontWeight:800, textTransform:"uppercase", letterSpacing:0.8, color:C.cinza, marginBottom:10 }}>Sessão concluída</div>
+        <div style={{ width:64, height:64, borderRadius:"50%", background:C.cianoClaro, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
+          <Check size={34} color={_fcVerde} />
+        </div>
+        <div style={{ fontSize:15, color:C.cinza, fontWeight:600 }}>Você dominou</div>
+        <div style={{ fontSize:46, fontWeight:800, color:C.azul, lineHeight:1.05, margin:"2px 0 10px" }}>{total}/{total}</div>
+        <div style={{ fontSize:14.5, color:C.cinza, lineHeight:1.5 }}>
+          {reviram === 0
+            ? "Todas de primeira — mandou bem!"
+            : <><strong style={{ color:C.tinta }}>{primeira}</strong> de primeira, <strong style={{ color:C.tinta }}>{reviram}</strong> na revisão</>}
+        </div>
+        <div style={{ display:"flex", justifyContent:"center", marginTop:20 }}>
+          <button onClick={() => setS(novaSessao())} style={{ ..._matNavBtn, padding:"13px 22px", fontSize:14.5 }}><RotateCw size={16} /> Refazer</button>
+        </div>
+      </div>
+    );
+  }
+
+  const feitos = idx;                      // cards já respondidos nesta rodada
+  const pct = Math.round((feitos / fila.length) * 100);
+  const flip = () => {
+    if (animando) return;
+    setS((p) => ({ ...p, animando: true }));
+    clearTimeout(flipTimer.current);
+    flipTimer.current = setTimeout(() => setS((q) => ({ ...q, virado: !q.virado, animando: false })), 170);
+  };
+
+  return (
+    <div>
+      <style>{_fcEstiloFlip}</style>
+      {/* progresso + contagem (na revisão, reflete o subconjunto) */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:7, gap:10 }}>
+        {rodada > 1
+          ? <span style={{ fontSize:11.5, fontWeight:800, textTransform:"uppercase", letterSpacing:0.5, color:C.ciano, display:"inline-flex", alignItems:"center", gap:6 }}><RotateCw size={13} color={C.ciano} /> {fila.length === 1 ? "Revisando o card que faltou" : `Revisando os ${fila.length} que faltaram`}</span>
+          : <span style={{ fontSize:11.5, fontWeight:800, textTransform:"uppercase", letterSpacing:0.5, color:C.cinza }}>Estudo</span>}
+        <span style={{ fontSize:13, fontWeight:700, color:C.cinza, whiteSpace:"nowrap" }}>{feitos} de {fila.length}</span>
+      </div>
+      <div style={{ height:8, borderRadius:999, background:"#E3EAF2", overflow:"hidden", marginBottom:16 }}>
+        <div style={{ height:"100%", width:`${pct}%`, borderRadius:999, background:`linear-gradient(90deg, ${C.azul}, ${C.ciano})`, transition:"width .3s ease" }} />
+      </div>
+
+      {/* card com flip discreto (squish) */}
+      <div className="fcs-cena">
+        <div className={"fcs-carta" + (animando ? " fcs-squish" : "")} onClick={flip} role="button" tabIndex={0}
+          aria-label={virado ? "Verso do card" : "Frente do card — toque para virar"}
+          onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); } }}
+          style={{ background: virado ? C.cianoClaro : "#fff" }}>
+          <div style={{ fontSize:11, fontWeight:800, letterSpacing:0.8, textTransform:"uppercase", color: virado ? C.ciano : C.cinza, marginBottom:12 }}>{virado ? "Verso" : "Frente"}</div>
+          <div style={{ fontSize:18, lineHeight:1.45, color:C.tinta, fontWeight: virado ? 400 : 600 }}><MathText>{virado ? card.verso : card.frente}</MathText></div>
+          {!virado && <div style={{ marginTop:18, fontSize:12, color:C.cinza, display:"flex", alignItems:"center", gap:6 }}><RotateCw size={13} color={C.cinza} /> toque para virar</div>}
+        </div>
+      </div>
+
+      {/* ações: só aparecem no verso */}
+      {virado ? (
+        <div style={{ display:"flex", gap:10, marginTop:16 }}>
+          <button onClick={() => responder(false)}
+            style={{ flex:1, minHeight:54, display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8, border:`1.5px solid ${_fcVermelho}`, background:"#fff", color:_fcVermelho, borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+            <X size={18} color={_fcVermelho} /> Não lembrei
+          </button>
+          <button onClick={() => responder(true)}
+            style={{ flex:1, minHeight:54, display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8, border:"none", background:_fcVerde, color:"#fff", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+            <Check size={18} color="#fff" /> Lembrei
+          </button>
+        </div>
+      ) : (
+        <div style={{ display:"flex", justifyContent:"center", marginTop:16 }}>
+          <button onClick={flip}
+            style={{ minHeight:54, padding:"0 26px", display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8, border:"none", background:C.azul, color:"#fff", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+            Ver resposta
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+function Quiz({ questions }) {
+  useKatexPronto();
+  const [i, setI] = React.useState(0);
+  const [escolha, setEscolha] = React.useState(null); // índice 0..3 ou null
+  const [acertos, setAcertos] = React.useState(0);
+  const [fim, setFim] = React.useState(false);
+  const q = questions[i];
+  const respondido = escolha !== null;
+  const responder = (idx) => { if (respondido) return; setEscolha(idx); if (idx === q.correta) setAcertos((a) => a + 1); };
+  const proxima = () => { if (i + 1 >= questions.length) setFim(true); else { setI(i + 1); setEscolha(null); } };
+  const reiniciar = () => { setI(0); setEscolha(null); setAcertos(0); setFim(false); };
+  if (fim) return (
+    <div style={{ textAlign:"center", padding:"24px 16px" }}>
+      <div style={{ fontSize:12, fontWeight:800, textTransform:"uppercase", letterSpacing:0.8, color:C.cinza, marginBottom:8 }}>Resultado</div>
+      <div style={{ fontSize:42, fontWeight:800, color:C.azul, lineHeight:1 }}>{acertos}/{questions.length}</div>
+      <div style={{ display:"flex", justifyContent:"center", marginTop:18 }}><button onClick={reiniciar} style={_matNavBtn}><RotateCw size={15} /> Refazer</button></div>
+    </div>
+  );
+  return (
+    <div>
+      <div style={{ fontSize:12, color:C.cinza, fontWeight:700, marginBottom:8 }}>Questão {i + 1} de {questions.length}</div>
+      <div style={{ fontSize:16, fontWeight:700, color:C.tinta, lineHeight:1.4, marginBottom:14 }}><MathText>{q.pergunta}</MathText></div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {q.alternativas.map((texto, idx) => {
+          const ehCorreta = idx === q.correta;
+          const ehEscolhida = idx === escolha;
+          let bg = "#fff", bd = "#E3EAF2", fg = C.tinta;
+          if (respondido && ehCorreta) { bg = "#EAF7EF"; bd = "#1F8A5B"; fg = "#15663F"; }
+          else if (respondido && ehEscolhida && !ehCorreta) { bg = "#FBEAE8"; bd = "#C0392B"; fg = "#7A2616"; }
+          return (
+            <button key={idx} onClick={() => responder(idx)} disabled={respondido}
+              style={{ display:"flex", gap:10, alignItems:"flex-start", textAlign:"left", border:`1.5px solid ${bd}`, background:bg, color:fg, borderRadius:11, padding:"12px 14px", fontSize:14.5, cursor: respondido ? "default" : "pointer", fontFamily:"inherit", lineHeight:1.4 }}>
+              <span style={{ fontWeight:800 }}>{String.fromCharCode(65 + idx)}</span><span style={{ flex:1 }}><MathText>{texto}</MathText></span>
+              {respondido && ehCorreta && <Check size={17} color="#1F8A5B" />}
+              {respondido && ehEscolhida && !ehCorreta && <X size={17} color="#C0392B" />}
+            </button>
+          );
+        })}
+      </div>
+      {respondido && q.explicacao && (
+        <div style={{ marginTop:14, background:C.papel, border:"1px solid #E3EAF2", borderRadius:11, padding:"12px 14px", fontSize:14, lineHeight:1.5, color:C.cinza }}>
+          <strong style={{ color:C.azul }}>Explicação. </strong><MathText>{q.explicacao}</MathText>
+        </div>
+      )}
+      {respondido && (
+        <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }}>
+          <button onClick={proxima} style={_matNavBtn}>{i + 1 >= questions.length ? "Ver resultado" : "Próxima"} <ChevronRight size={16} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+/* tipos de material presentes em t.material (texto vazio = ausente) */
+function _tiposMaterial(t) {
+  const m = t && t.material; if (!m) return [];
+  const out = [];
+  if (m.audioUrl) out.push({ k:"audio", ic:Headphones, rotulo:"Podcast" });
+  if (Array.isArray(m.quiz) && m.quiz.length) out.push({ k:"quiz", ic:ListChecks, rotulo:"Quiz" });
+  if (m.flashcardsText && String(m.flashcardsText).trim()) out.push({ k:"flashcards", ic:Layers, rotulo:"Flashcards" });
+  if (m.slidesUrl) out.push({ k:"slides", ic:Presentation, rotulo:"Slides" });
+  return out;
+}
+/* Selo discreto na listagem do programa: ícones do que o trabalho oferece.
+   Sem material => null (o card aparece idêntico, sem marca de “faltando”). */
+function SeloMaterial({ t }) {
+  const tipos = _tiposMaterial(t);
+  const temPub = !!(t && t.material && t.material.linkArtigo);
+  if (!tipos.length && !temPub) return null;
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:6, flexShrink:0 }}>
+      {tipos.length > 0 && (
+        <span title={"Material complementar: " + tipos.map((x) => x.rotulo).join(" \u00b7 ")} aria-label={"Material complementar: " + tipos.map((x) => x.rotulo).join(", ")}
+          style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 9px", borderRadius:999, background:C.cianoClaro }}>
+          {tipos.map((x) => { const Ic = x.ic; return <Ic key={x.k} size={13} color={C.azul} />; })}
+        </span>
+      )}
+      {temPub && (
+        <span title="Trabalho com publicação revisada por pares" aria-label="Trabalho com publicação revisada por pares"
+          style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"4px 9px", borderRadius:999, background:C.azul }}>
+          <BookOpenCheck size={13} color="#fff" />
+        </span>
+      )}
+    </span>
+  );
+}
+/* Publicação revisada por pares — credencial acadêmica, SEPARADA do material de
+   estudo. Botão destacado + citação visível. Só aparece se houver linkArtigo. */
+function Publicacao({ t, cor }) {
+  const m = t && t.material;
+  if (!m || !m.linkArtigo) return null;
+  return (
+    <div style={{ marginBottom:22, border:`1px solid ${C.azul}33`, borderRadius:14, overflow:"hidden", background:C.cianoClaro }}>
+      <div style={{ padding:"16px 18px", display:"flex", flexDirection:"column", gap:12 }}>
+        <div style={{ display:"flex", gap:11, alignItems:"flex-start" }}>
+          <span style={{ width:38, height:38, borderRadius:10, background:C.azul, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><BookOpenCheck size={20} color="#fff" /></span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:C.azul, textTransform:"uppercase", letterSpacing:0.6 }}>Trabalho publicado</div>
+            <div style={{ fontSize:13, color:C.cinza, marginTop:2, lineHeight:1.4 }}>Resultado revisado por pares em periódico científico.</div>
+          </div>
+        </div>
+        {m.publicacao && (
+          <div style={{ fontSize:14, lineHeight:1.55, color:C.tinta, background:"#fff", border:"1px solid #E3EAF2", borderRadius:10, padding:"12px 14px" }}>{m.publicacao}</div>
+        )}
+        <a href={m.linkArtigo} target="_blank" rel="noopener noreferrer"
+          style={{ display:"inline-flex", alignSelf:"flex-start", alignItems:"center", gap:8, textDecoration:"none", background:C.azul, color:"#fff", borderRadius:10, padding:"11px 18px", fontSize:14, fontWeight:700 }}>
+          <BookOpenCheck size={16} color="#fff" /> Ver publicação
+        </a>
+      </div>
+    </div>
+  );
+}
+function MaterialSuplementar({ t }) {
+  const m = t.material || null;
+  const cor = AREA_COR[t.area] || C.azul;
+  const flashcards = React.useMemo(() => (m ? parseFlashcards(m.flashcardsText) : []), [m]);
+  const quiz = (m && Array.isArray(m.quiz)) ? m.quiz : [];
+  const temAudio = !!(m && m.audioUrl);
+  const temSlides = !!(m && m.slidesUrl);
+  const abas = [];
+  if (temAudio) abas.push({ k:"audio", t:"Ouvir", ic:Headphones });
+  if (quiz.length) abas.push({ k:"quiz", t:"Quiz", ic:ListChecks });
+  if (flashcards.length) abas.push({ k:"flashcards", t:"Flashcards", ic:Layers });
+  if (temSlides) abas.push({ k:"slides", t:"Slides", ic:Presentation });
+  const [aba, setAba] = React.useState(abas.length ? abas[0].k : null);
+  if (!abas.length) return null;
+  const abaEff = abas.some((a) => a.k === aba) ? aba : abas[0].k;
+  return (
+    <div style={{ marginBottom:24, border:"1px solid #E3EAF2", borderRadius:14, overflow:"hidden" }}>
+      <div style={{ padding:"12px 16px", background:C.papel, borderBottom:"1px solid #E3EAF2" }}>
+        <span style={{ fontSize:13, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.6 }}>Material complementar</span>
+      </div>
+      <div style={{ display:"flex", gap:6, padding:"12px 16px 0", flexWrap:"wrap" }}>
+        {abas.map((a) => {
+          const on = abaEff === a.k; const Ic = a.ic;
+          return <button key={a.k} onClick={() => setAba(a.k)} style={{ display:"inline-flex", alignItems:"center", gap:7, border:"none", borderRadius:999, padding:"9px 15px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit", background:on ? cor : "#fff", color:on ? "#fff" : C.cinza, boxShadow:on ? "none" : "inset 0 0 0 1px #E3EAF2" }}><Ic size={15} color={on ? "#fff" : C.cinza} /> {a.t}</button>;
+        })}
+      </div>
+      <div style={{ padding:16 }}>
+        {abaEff === "audio" && <AudioMaterial src={m.audioUrl} cor={cor} />}
+        {abaEff === "quiz" && <Quiz questions={quiz} />}
+        {abaEff === "flashcards" && <Flashcards cards={flashcards} />}
+        {abaEff === "slides" && <SlidesMaterial src={m.slidesUrl} cor={cor} />}
+      </div>
+    </div>
+  );
+}
+
+/* Estilos do navegador entre trabalhos (← Anterior / Próximo →) na leitura */
+const navLerBtn = (on) => ({ flex:1, minWidth:0, display:"flex", alignItems:"center", gap:9, padding:"11px 14px", borderRadius:12, border:"1px solid #E3EAF2", background: on ? "#fff" : "#F7F9FB", cursor: on ? "pointer" : "default", opacity: on ? 1 : 0.55, fontFamily:"inherit", textAlign:"left" });
+const navLerTitulo = { fontSize:12.5, fontWeight:700, color:"#0C1A2B", lineHeight:1.3, marginTop:2, overflow:"hidden", textOverflow:"ellipsis", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" };
+
+function TrabalhoLeitura({ t, nav }) {
+  const cor = AREA_COR[t.area] || C.azul;
+  const [apreciarAberto, setApreciarAberto] = useState(false);
+  const fotoUrl = t.foto_autores_url || t.foto_autores_dataUrl;
+  const F = figsPorSecao(t);
+  const badge = { fontSize:12, fontWeight:700, padding:"4px 11px", borderRadius:999, background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.34)", whiteSpace:"nowrap" };
+  const FigLer = ({ f }) => {
+    const url = f.url || f.dataUrl;
+    return (
+      <div style={{ margin:"14px 0", border:`2px ${f.principal ? "solid" : "dashed"} ${f.principal ? C.ciano : cor + "55"}`, borderRadius:12, overflow:"hidden", background:f.principal ? C.cianoClaro : C.papel }}>
+        <div style={{ minHeight:120, display:"flex", alignItems:"center", justifyContent:"center", background:"#fff", padding:10 }}>
+          {url ? <img src={url} alt="" style={{ width:"100%", borderRadius:8 }} /> : <ImageIcon size={42} color={cor} />}
+        </div>
+        <div style={{ padding:"10px 14px", fontSize:13.5, color:C.cinza, lineHeight:1.4 }}>
+          <div style={{ display:"flex", gap:6, alignItems:"baseline" }}>
+            <strong style={{ color:C.azul, whiteSpace:"nowrap" }}>Fig {f.ordem}.</strong>
+            <span style={{ flex:1, fontWeight:f.titulo?700:400, color:f.titulo?C.tinta:C.cinza }}>{f.titulo || f.legenda}</span>
+            {f.principal && <span style={{ fontSize:11, fontWeight:800, color:C.ciano, whiteSpace:"nowrap" }}>★ PRINCIPAL</span>}
+          </div>
+          {f.titulo && f.legenda ? <div style={{ marginTop:3 }}>{f.legenda}</div> : null}
+        </div>
+      </div>
+    );
+  };
+  const Sec = ({ titulo, texto, figs }) => (texto || (figs && figs.length)) ? (
+    <div style={{ marginBottom:22 }}>
+      <div style={{ fontSize:13, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.6, marginBottom:7 }}>{titulo}</div>
+      {texto && <div style={{ fontSize:16, lineHeight:1.6, color:C.tinta, textAlign:"justify", whiteSpace:"pre-wrap" }}>{texto}</div>}
+      {figs && figs.map((f, i) => <FigLer key={i} f={f} />)}
+    </div>
+  ) : null;
+  return (
+    <div style={{ maxWidth:640, margin:"0 auto", background:"#fff", minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg, ${C.azul}, ${C.azulEsc})`, color:"#fff", padding:"26px 22px" }}>
+        <div style={{ display:"flex", gap:7, flexWrap:"wrap", marginBottom:14 }}>
+          <span style={badge}>{t.fase}ª FASE</span><span style={badge}>{t.desenho}</span>
+          <span style={{ ...badge, background:cor, borderColor:cor }}>{t.area}</span>
+          <span style={badge}>{t.id}</span>
+        </div>
+        <h1 style={{ fontSize:23, fontWeight:800, lineHeight:1.22, letterSpacing:-0.3, margin:0 }}>{t.titulo}</h1>
+        <div style={{ display:"flex", gap:14, alignItems:"center", marginTop:14 }}>
+          {fotoUrl && <div style={{ width:60, height:60, borderRadius:12, overflow:"hidden", flexShrink:0, border:"2px solid rgba(255,255,255,0.4)" }}><img src={fotoUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/></div>}
+          <div style={{ fontSize:15, opacity:0.92, lineHeight:1.4 }}>
+            {_autoresStr(t, " · ")}
+            {Number(t.fase) !== 7 && t.orientador ? <><br /><span style={{ opacity:0.8 }}>Orientação: {t.orientador}</span></> : null}
+            {t.afiliacao ? <><br /><span style={{ opacity:0.8, fontStyle:"italic" }}>{t.afiliacao}</span></> : null}
+          </div>
+        </div>
+      </div>
+      <div style={{ padding:"24px 22px 8px" }}>
+        {/* Publicação revisada por pares — credencial acadêmica, no topo e separada do material */}
+        <Publicacao t={t} cor={cor} />
+        {_ehResumo8(t) ? (
+          /* 8ª fase: o trabalho aparece como TEXTO do resumo submetido à revista */
+          <Sec titulo="Resumo" texto={t.resumo_completo} />
+        ) : (<>
+          {secoesRender(t).secoes.map((s) => <Sec key={s.campo} titulo={s.rotulo} texto={s.texto} figs={s.figs} />)}
+          {secoesRender(t).outras.length > 0 && <Sec titulo="Figuras complementares" figs={secoesRender(t).outras} />}
+        </>)}
+        {/* Material complementar gerado com IA (podcast · quiz · flashcards) */}
+        <MaterialSuplementar t={t} />
+        {/* Referências e palavras-chave em largura total ao pé */}
+        {!_ehResumo8(t) && <RefsLeitura t={t} cor={cor} />}
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:24 }}>
+          {_palavrasArr(t).map((p) => <span key={p} style={{ fontSize:13, background:C.papel, border:"1px solid #DCE5EE", borderRadius:999, padding:"6px 13px", color:C.cinza }}>{p}</span>)}
+        </div>
+      </div>
+      {/* CTA — Apreciar este trabalho (7ª e 8ª fase) */}
+      <div style={{ margin:"4px 22px 8px", padding:"18px 18px", borderRadius:14, background:C.cianoClaro, border:`1px solid ${C.ciano}33`, display:"flex", gap:14, alignItems:"center", flexWrap:"wrap" }}>
+        <div style={{ flex:1, minWidth:180 }}>
+          <div style={{ fontWeight:800, color:C.azul, fontSize:15.5 }}>Aprecie este trabalho</div>
+          <div style={{ fontSize:13, color:C.cinza, marginTop:3, lineHeight:1.4 }}>Sua opinião ajuda os autores e a banca. Leva poucos minutos.</div>
+        </div>
+        <button onClick={() => setApreciarAberto(true)} className="card-link"
+          style={{ display:"inline-flex", alignItems:"center", gap:8, background:C.azul, color:"#fff", border:"none", borderRadius:11, padding:"12px 18px", fontWeight:700, fontSize:14.5, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
+          <Award size={18} color="#fff" /> Apreciar este trabalho
+        </button>
+      </div>
+      {/* Navegação entre trabalhos do conjunto ativo (busca ou edição).
+         Sem wrap: extremos ficam desabilitados. Mostra o título do vizinho
+         apenas quando ele existe — nunca um campo vazio. */}
+      {nav && (nav.prevId || nav.nextId) && (
+        <div style={{ display:"flex", gap:10, margin:"8px 22px 4px" }}>
+          <button onClick={() => nav.irPara(nav.prevId)} disabled={!nav.prevId} aria-label="Trabalho anterior"
+            style={navLerBtn(!!nav.prevId)}>
+            <ChevronLeft size={20} color={nav.prevId ? C.azul : "#C5D2E0"} style={{ flexShrink:0 }} />
+            <span style={{ minWidth:0, textAlign:"left" }}>
+              <span style={{ display:"block", fontSize:11, fontWeight:800, letterSpacing:0.4, textTransform:"uppercase", color: nav.prevId ? C.ciano : "#9AA8B8" }}>Anterior</span>
+              {nav.prevT && <span style={navLerTitulo}>{nav.prevT.titulo}</span>}
+            </span>
+          </button>
+          <button onClick={() => nav.irPara(nav.nextId)} disabled={!nav.nextId} aria-label="Próximo trabalho"
+            style={{ ...navLerBtn(!!nav.nextId), justifyContent:"flex-end" }}>
+            <span style={{ minWidth:0, textAlign:"right" }}>
+              <span style={{ display:"block", fontSize:11, fontWeight:800, letterSpacing:0.4, textTransform:"uppercase", color: nav.nextId ? C.ciano : "#9AA8B8" }}>Próximo</span>
+              {nav.nextT && <span style={navLerTitulo}>{nav.nextT.titulo}</span>}
+            </span>
+            <ChevronRight size={20} color={nav.nextId ? C.azul : "#C5D2E0"} style={{ flexShrink:0 }} />
+          </button>
+        </div>
+      )}
+      <div style={{ borderTop:"1px solid #EEF2F6", padding:"18px 22px 30px", textAlign:"center" }}>
+        <div style={{ fontSize:15, fontWeight:800, color:C.azul, letterSpacing:0.5 }}>SAM · MEDICINA UNIDAVI</div>
+        <div style={{ fontSize:12, color:C.cinza, marginTop:4 }}>XI Semana Acadêmica da Medicina · 2026</div>
+      </div>
+      {apreciarAberto && <FluxoApreciacao t={t} onClose={() => setApreciarAberto(false)} />}
+    </div>
+  );
+}
+
+/* ---------------- HEADER DO SITE (não aparece no telão) ---------------- */
+function SiteHeader() {
+  return (
+    <header style={{ background:"#fff", borderBottom:"1px solid #E3EAF2", position:"sticky", top:0, zIndex:10 }}>
+      <div style={{ maxWidth:980, margin:"0 auto", padding:"0 16px", display:"flex", alignItems:"center", gap:12, height:60 }}>
+        {/* LOGO: UNIDAVI (branca, sobre chip azul) + lockup Medicina UNIDAVI */}
+        <div onClick={() => go("#/")} style={{ display:"flex", alignItems:"center", gap:11, cursor:"pointer" }}>
+          <div style={{ height:42, padding:"0 12px", borderRadius:10, background:C.azul, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <img src={(window.__resources && window.__resources.logoUnidavi) || "assets/logo-unidavi.png"} alt="UNIDAVI" style={{ height:24, width:"auto", display:"block" }} />
+          </div>
+          <div style={{ lineHeight:1, paddingLeft:2, borderLeft:"1px solid #E3EAF2", marginLeft:1, paddingTop:1, paddingBottom:1 }}>
+            <div style={{ fontWeight:800, fontSize:17, color:C.azul, letterSpacing:-0.3, whiteSpace:"nowrap" }}>SAM <span style={{ color:C.ciano }}>2026</span></div>
+            <div style={{ fontSize:11, color:C.cinza, marginTop:2, whiteSpace:"nowrap" }}>Medicina UNIDAVI</div>
+          </div>
+        </div>
+        {(() => {
+          const sobre = (window.location.hash || "").includes("sobre");
+          const link = (on) => ({ fontSize:14, fontWeight:700, textDecoration:"none", padding:"10px 14px", borderRadius:9, color:on ? "#fff" : C.cinza, background:on ? C.azul : "transparent" });
+          return (
+            <nav style={{ marginLeft:"auto", display:"flex", gap:4 }}>
+              <a href="#/" style={link(!sobre)}>Programação</a>
+              <a href="#/sobre" style={link(sobre)}>Sobre</a>
+              <a href="#/" onClick={(e) => { e.preventDefault(); const ir = () => { const el = document.getElementById("arquivo-edicoes"); if (el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 68, behavior:"smooth" }); }; if ((window.location.hash || "#/") !== "#/") { go("#/"); setTimeout(ir, 90); } else { ir(); } }} style={link(false)}>Arquivo</a>
+            </nav>
+          );
+        })()}
+      </div>
+    </header>
+  );
+}
+
+Object.assign(window, { PosterVitrine, PosterCompleto, PosterCompletoLandscape, TrabalhoLeitura, SiteHeader, vbadge, MaterialSuplementar, SeloMaterial });

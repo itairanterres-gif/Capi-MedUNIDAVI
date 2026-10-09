@@ -20,5 +20,6 @@ for (const dir of plan.installs) {
 }
 run(['node_modules/typescript/bin/tsc', '-b'], 'apps/sessao');
 run(['node_modules/vite/bin/vite.js', 'build', '--outDir', 'dist-pages'], 'apps/sessao');
+if (plan.env.CAPI_SAM_ENABLED === '1') run(['apps/sam/build.mjs'], '.');
 run(['build-pages.mjs'], 'apps/shell');
 console.log(fixture ? 'Local fixture build; not ready for production login.' : 'Integrated Git build completed.');

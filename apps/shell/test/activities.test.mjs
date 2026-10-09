@@ -20,3 +20,11 @@ test('login page has a hidden activities area filled only by the client after lo
   const html = renderLogin();
   assert.match(html, /<nav id="activities" class="activities" aria-label="Suas atividades" hidden><\/nav>/);
 });
+
+test('SAM appears only when enabled: students go to their work, docents to curadoria', () => {
+  assert.ok(!hrefs('aluno', { amrigs: true }).some(h => h.startsWith('/sam/')));
+  assert.ok(hrefs('aluno', { amrigs: true, sam: true }).includes('/sam/submissao.html'));
+  assert.ok(hrefs('professor', { sam: true }).includes('/sam/curadoria.html'));
+  assert.ok(hrefs('admin', { sam: true }).includes('/sam/curadoria.html'));
+  assert.ok(!hrefs('egresso', { sam: true }).some(h => h.startsWith('/sam/')));
+});

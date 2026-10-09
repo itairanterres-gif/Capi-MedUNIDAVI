@@ -3,9 +3,9 @@ import { mkdir, writeFile, readFile, cp, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { hostedReleaseContract } from './hosted-release-contract.mjs';
-import { loadIntegration } from './integration.mjs';
+import { loadIntegration, samConfig } from './integration.mjs';
 import { validateHostedOrigin } from './config-contract.mjs';
-import { pagesHeaders, pagesRedirects, notFoundHTML } from './pages-hosting.mjs';
+import { pagesHeaders, pagesRedirects, notFoundHTML, samPagesHeaders, samRedirects } from './pages-hosting.mjs';
 import { readApprovedAssets } from './approved-assets.mjs';
 import { createShell } from './server.mjs';
 import { publicAssets } from '../../packages/public-about/assets.mjs';
@@ -41,6 +41,11 @@ export async function buildHosted(env = process.env) {
     await mkdir(path.join(output, 'questoes'), { recursive: true });
     await cp(path.join(integration.root, 'index.html'), path.join(output, 'questoes/index.html'));
     await cp(path.join(integration.root, 'assets'), path.join(output, 'questoes/assets'), { recursive: true });
+    // SAM pré-compilado (apps/sam/build.mjs); a configuração aponta para o mesmo Supabase e login.
+    if (integration.samDir) {
+      await cp(integration.samDir, path.join(output, 'sam'), { recursive: true });
+      await writeFile(path.join(output, 'sam/sam-config.js'), samConfig(integration));
+    }
     // All hosted outputs, including local fixtures, contain no protected PNGs.
     await readApprovedAssets(env);
     const config = {
@@ -53,8 +58,8 @@ export async function buildHosted(env = process.env) {
       ] }],
     };
     if (env.CAPI_HOSTING_TARGET === 'cloudflare-pages') {
-      await writeFile(path.join(output, '_headers'), pagesHeaders(integration.url));
-      await writeFile(path.join(output, '_redirects'), pagesRedirects);
+      await writeFile(path.join(output, '_headers'), pagesHeaders(integration.url) + (integration.samDir ? samPagesHeaders(integration.url) : ''));
+      await writeFile(path.join(output, '_redirects'), pagesRedirects + (integration.samDir ? samRedirects : ''));
       await writeFile(path.join(output, '404.html'), notFoundHTML);
       await writeFile(new URL('./pages.candidate.json', import.meta.url), JSON.stringify({
         hosting: 'cloudflare-pages', outputDirectory: 'hosted-dist', origin,

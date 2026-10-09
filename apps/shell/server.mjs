@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { publicAssets } from '../../packages/public-about/assets.mjs';
 import { selectPerspective } from '../../packages/public-about/index.mjs';
 import { renderHome, renderShellAbout, renderLogin, renderAmrigsPilot } from './pages.mjs';
-import { loadIntegration, moduleAsset, amrigsImage } from './integration.mjs';
+import { loadIntegration, moduleAsset, amrigsImage, samAsset, samConfig } from './integration.mjs';
+import { samCSP } from './pages-hosting.mjs';
 
 const assets = new Map(publicAssets);
 assets.set('/shell.css', { file: new URL('./public/shell.css', import.meta.url), type: 'text/css; charset=utf-8' });
@@ -30,7 +31,7 @@ export function createShell({ resolveAudience = async () => null, integration = 
       }
       if (integration && (url.pathname === '/entrar' || url.pathname === '/entrar/')) { send(200, renderLogin()); return; }
       if (integration && url.pathname === '/auth-config.json') {
-        send(200, JSON.stringify({ url: integration.url, key: integration.key, storageKey: integration.storageKey, googleEnabled: !!integration.googleEnabled, amrigsPilot: !!integration.amrigsPilot, privateImages: integration.privateImages }), 'application/json'); return;
+        send(200, JSON.stringify({ url: integration.url, key: integration.key, storageKey: integration.storageKey, googleEnabled: !!integration.googleEnabled, amrigsPilot: !!integration.amrigsPilot, privateImages: integration.privateImages, sam: !!integration.samDir }), 'application/json'); return;
       }
       if (integration && url.pathname === '/auth.js') { send(200, await readFile(new URL('./dist/auth.js', import.meta.url)), 'text/javascript; charset=utf-8'); return; }
       if (integration?.amrigsPilot && url.pathname === '/amrigs') { res.writeHead(302, { Location: '/amrigs/' }); res.end(); return; }
@@ -39,6 +40,14 @@ export function createShell({ resolveAudience = async () => null, integration = 
       if (integration?.amrigsPilot && url.pathname.startsWith('/amrigs/')) {
         const image = await amrigsImage(integration.amrigsAssets, url.pathname);
         if (image) send(200, image, 'image/png'); else send(404, 'Figura não encontrada.', 'text/plain; charset=utf-8');
+        return;
+      }
+      if (integration?.samDir && (url.pathname === '/sam' || url.pathname.startsWith('/sam/'))) {
+        if (url.pathname === '/sam') { res.writeHead(302, { Location: '/sam/' }); res.end(); return; }
+        res.setHeader('Content-Security-Policy', samCSP(integration.url));
+        if (url.pathname === '/sam/sam-config.js') { send(200, samConfig(integration), 'text/javascript; charset=utf-8'); return; }
+        const asset = await samAsset(integration.samDir, url.pathname);
+        if (asset) send(200, asset.body, asset.type); else send(404, 'Página não encontrada.', 'text/plain; charset=utf-8');
         return;
       }
       if (integration && url.pathname === '/questoes') { res.writeHead(302, { Location: '/questoes/' }); res.end(); return; }

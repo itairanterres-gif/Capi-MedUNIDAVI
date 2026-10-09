@@ -18,6 +18,8 @@ export function buildPlan(root, input, { fixture = false } = {}) {
     CAPI_QUESTOES_DIST: path.join(root, 'apps/sessao/dist-pages'),
     CAPI_AMRIGS_MANIFEST: path.join(root, 'build-inputs/amrigs/manifest.json'),
     CAPI_AMRIGS_ASSETS: '', CAPI_AMRIGS_PACKAGE: '',
+    // SAM fica desligado até as tabelas existirem no banco de produção.
+    CAPI_SAM_ENABLED: input.CAPI_SAM_ENABLED === '1' ? '1' : '0', CAPI_SAM_DIST: path.join(root, 'apps/sam/dist'),
     VITE_CAPI_INTEGRATED: '1', VITE_CAPI_LOCAL_HOMOLOGATION: '0', VITE_DATA_MODE: 'supabase',
     VITE_SUPABASE_URL: canonicalURL, VITE_SUPABASE_ANON_KEY: key,
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
