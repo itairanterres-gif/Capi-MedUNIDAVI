@@ -14,6 +14,44 @@ function _samDiaDeHoje() {
   const mm = String(hoje.getMonth() + 1).padStart(2, "0");
   return DIAS.find((d) => d.includes(dd + "/" + mm)) || null;
 }
+/* HERO da edição atual: a arte vem sem texto (o "XII" luminoso é a imagem);
+   título, datas e logos são escritos aqui, a partir de EDICAO_ATUAL.
+   Desktop: arte 16:9 com o texto à esquerda · Celular: arte vertical com o texto embaixo. */
+function HeroEdicaoAtual() {
+  const ed = EDICAO_ATUAL;
+  return (
+    <div className="sam-hero" style={{ background:"#020F2E", borderRadius:18, overflow:"hidden", boxShadow:"0 10px 30px rgba(2,40,90,0.14)" }}>
+      <style>{`
+        .sam-hero-palco{ position:relative; aspect-ratio:16/9; }
+        .sam-hero-palco picture img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:right center; display:block; }
+        .sam-hero-texto{ position:absolute; left:0; top:0; bottom:0; width:52%; display:flex; flex-direction:column; justify-content:center; padding:clamp(20px,4.5vw,52px); box-sizing:border-box; }
+        .sam-hero-titulo{ font-size:clamp(22px,3.6vw,40px); }
+        @media (max-width: 640px){
+          .sam-hero-palco{ aspect-ratio:3/4; }
+          .sam-hero-palco picture img{ object-position:center top; }
+          .sam-hero-texto{ top:auto; width:100%; justify-content:flex-end; padding:22px 20px 24px; }
+          .sam-hero-titulo{ font-size:27px; }
+        }
+      `}</style>
+      <div className="sam-hero-palco">
+        <picture>
+          <source media="(max-width: 640px)" srcSet="assets/xii-arte-mobile.jpg" />
+          <img src="assets/xii-arte-desktop.jpg" width="1672" height="941" alt="" />
+        </picture>
+        <div className="sam-hero-texto">
+          <h1 className="sam-hero-titulo" style={{ margin:0, color:"#fff", fontWeight:800, lineHeight:1.08, letterSpacing:-0.3 }}>
+            {ed.romano} Semana Acadêmica<br />da <span style={{ color:C.ciano }}>Medicina UNIDAVI</span>
+          </h1>
+          <div style={{ marginTop:"clamp(12px,1.8vw,20px)", color:C.ciano, fontWeight:700, fontSize:"clamp(15px,1.9vw,21px)" }}>{ed.datasTexto}</div>
+          {ed.local ? <div style={{ marginTop:4, color:"#CFE3F7", fontSize:"clamp(12.5px,1.4vw,15px)", fontWeight:500 }}>{ed.local} · Rio do Sul/SC</div> : null}
+        </div>
+      </div>
+      <img src="assets/xii-logos.jpg" width="1200" height="167" alt="Medicina UNIDAVI · NPCMed — Núcleo de Pesquisa em Ciências Médicas · SAM"
+        style={{ width:"100%", height:"auto", display:"block" }} />
+    </div>
+  );
+}
+
 /* Avatar do autor (foto liberada) — placeholder neutro se sem foto */
 function AvatarAutor({ url, size = 38 }) {
   return url ? (
@@ -66,7 +104,7 @@ function ArquivoEdicoes() {
         <Layers size={18} color={C.azul} />
         <h2 style={{ fontSize:18, fontWeight:800, color:C.tinta, margin:0 }}>Edições anteriores</h2>
       </div>
-      <div style={{ fontSize:13.5, color:C.cinza, marginBottom:16, lineHeight:1.4 }}>Dez edições já realizadas — o arquivo de cada uma, com programa, autoria e transmissões.</div>
+      <div style={{ fontSize:13.5, color:C.cinza, marginBottom:16, lineHeight:1.4 }}>Onze edições já realizadas — o arquivo de cada uma, com programa, autoria e transmissões.</div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(158px, 1fr))", gap:12 }}>
         {eds.map((e) => (
           <a key={e.id} href={"edicao.html#/edicao/" + e.id} className="card-link"
@@ -110,7 +148,7 @@ function Home() {
   });
   const [filtro, setFiltro] = useState("Todos");
   const [busca, setBusca] = useState(() => { try { return new URLSearchParams(window.location.search).get("q") || ""; } catch (e) { return ""; } });
-  const [escopo, setEscopo] = useState("edicao");        // "edicao" (XI) | "todas" (arquivo)
+  const [escopo, setEscopo] = useState("edicao");        // "edicao" (atual) | "todas" (arquivo)
   const todasEd = useTodasEdicoes(escopo === "todas");
   const { trabalhos, status, recarregar } = useTrabalhos();
   const buscaNorm = normalizaNome(busca);
@@ -140,6 +178,7 @@ function Home() {
     return () => clearInterval(iv);
   }, [painel]);
   const d = PROGRAMA[dia];
+  const programaVazio = DIAS.every((dd) => !PROGRAMA[dd].orais.length && !PROGRAMA[dd].posteres.length);
   const orais = d.orais.filter((o) => filtro === "Todos" || o.area === filtro);
   const areasDoDia = [...new Set(d.orais.map((o) => o.area))];
   /* Pílula 999px = filtro/seleção (intencional; alternadores de MODO usam retângulo — ver vchip em submissao-app.jsx) */
@@ -148,19 +187,7 @@ function Home() {
     <div>
       <SiteHeader />
       <div style={{ maxWidth:980, margin:"0 auto", padding:"24px 16px 60px" }}>
-        {/* HERO — arte oficial (texto já embutido). Desktop: widescreen · Mobile: quadrada */}
-        {/* Contêiner azul-escuro reserva o espaço e segura o fundo enquanto o JPG carrega */}
-        <div style={{ background:C.azulEsc, borderRadius:18, overflow:"hidden", boxShadow:"0 10px 30px rgba(2,40,90,0.14)" }}>
-          <picture>
-            <source media="(max-width: 640px)" srcSet={(window.__resources && window.__resources.heroMobile) || "assets/hero-mobile.jpg"} />
-            <img
-              src={(window.__resources && window.__resources.heroDesktop) || "assets/hero-desktop.jpg"}
-              width="1400" height="775"
-              alt="XI Semana Acadêmica da Medicina UNIDAVI · 22 a 26 de junho de 2026 · Auditório Célio Simão Martignago · Rio do Sul/SC"
-              style={{ width:"100%", height:"auto", display:"block" }}
-            />
-          </picture>
-        </div>
+        <HeroEdicaoAtual />
         {/* Assistir ao vivo no YouTube — Canal UNIDAVI TV */}
         <div style={{ display:"flex", justifyContent:"center", marginTop:14 }}>
           <a href="https://www.youtube.com/@UNIDAVITV" target="_blank" rel="noopener noreferrer"
@@ -178,14 +205,14 @@ function Home() {
         {/* Busca — filtra orais + pôsteres de todos os dias por autor, título ou área */}
         <div style={{ position:"relative", marginBottom:16 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.cinza} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={escopo === "todas" ? "Buscar nas dez edições anteriores…" : "Buscar trabalho, autor ou área…"} aria-label="Buscar trabalho, autor ou área"
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={escopo === "todas" ? "Buscar nas edições anteriores…" : "Buscar trabalho, autor ou área…"} aria-label="Buscar trabalho, autor ou área"
             style={{ width:"100%", padding:"13px 42px 13px 42px", border:"1px solid #E3EAF2", borderRadius:11, fontSize:14.5, color:C.tinta, background:"#fff", boxSizing:"border-box" }} />
           {busca && (
             <button onClick={() => setBusca("")} aria-label="Limpar busca" style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:30, height:30, border:"none", background:"transparent", color:C.cinza, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", borderRadius:8 }}><X size={16} /></button>
           )}
         </div>
 
-        {/* Escopo da busca: nesta edição (XI, ao vivo) ou todas as edições do arquivo */}
+        {/* Escopo da busca: nesta edição (a atual) ou todas as edições do arquivo */}
         <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:18, flexWrap:"wrap" }}>
           <span style={{ fontSize:12.5, color:C.cinza, fontWeight:600 }}>Buscar em:</span>
           <div style={{ display:"inline-flex", background:"#fff", border:"1px solid #E3EAF2", borderRadius:999, padding:3, gap:3 }}>
@@ -239,7 +266,16 @@ function Home() {
           </div>
         )}
 
-        {escopo === "edicao" && busca.trim() === "" && (
+        {escopo === "edicao" && busca.trim() === "" && programaVazio && (
+          <div style={{ background:"#fff", border:"1px solid #E3EAF2", borderRadius:12, padding:"22px 20px", marginBottom:30, textAlign:"center" }}>
+            <div style={{ fontWeight:800, color:C.tinta, fontSize:16 }}>Programação em breve</div>
+            <div style={{ fontSize:13.5, color:C.cinza, marginTop:6, lineHeight:1.45 }}>
+              Os trabalhos da {EDICAO_ATUAL.romano} SAM entram aqui conforme forem publicados pela curadoria. Enquanto isso, explore as edições anteriores em “Todas as edições”.
+            </div>
+          </div>
+        )}
+
+        {escopo === "edicao" && busca.trim() === "" && !programaVazio && (
         <>
         <div style={{ display:"flex", gap:6, marginBottom:14, flexWrap:"wrap", alignItems:"center" }}>
           {DIAS.map((dd) => (
@@ -380,7 +416,7 @@ function Home() {
             por decisão de produto; EstadoVazio segue em uso no Telão.) */}
       </div>
       <ArquivoEdicoes />
-      <footer style={{ textAlign:"center", padding:"24px 16px 40px", color:C.cinza, fontSize:12 }}>XI SAM 2026 · Medicina UNIDAVI</footer>
+      <footer style={{ textAlign:"center", padding:"24px 16px 40px", color:C.cinza, fontSize:12 }}>{EDICAO_ATUAL.romano} SAM 2026 · Medicina UNIDAVI</footer>
     </div>
   );
 } 
@@ -399,7 +435,7 @@ function TelaSistema({ children }) {
             <ArrowLeft size={22} color="#fff" />
           </button>
           <div style={{ display:"flex", alignItems:"baseline", gap:8, minWidth:0 }}>
-            <span style={{ fontSize:15, fontWeight:800, whiteSpace:"nowrap" }}>XI SAM <span style={{ color:C.ciano }}>2026</span></span>
+            <span style={{ fontSize:15, fontWeight:800, whiteSpace:"nowrap" }}>{EDICAO_ATUAL.romano} SAM <span style={{ color:C.ciano }}>2026</span></span>
             <span style={{ fontSize:11.5, color:"rgba(255,255,255,0.78)", whiteSpace:"nowrap" }}>Medicina UNIDAVI</span>
           </div>
         </div>
@@ -596,11 +632,11 @@ function Sobre() {
       <SiteHeader />
       <div style={{ maxWidth:760, margin:"0 auto", padding:"30px 16px 70px" }}>
         <div style={{ fontSize:12, letterSpacing:2, fontWeight:700, color:C.ciano, marginBottom:8 }}>SOBRE</div>
-        <h1 style={{ fontSize:32, fontWeight:800, color:C.tinta, letterSpacing:-0.6, margin:"0 0 24px", lineHeight:1.1 }}>Sobre a XI SAM</h1>
+        <h1 style={{ fontSize:32, fontWeight:800, color:C.tinta, letterSpacing:-0.6, margin:"0 0 24px", lineHeight:1.1 }}>Sobre a {EDICAO_ATUAL.romano} SAM</h1>
 
         <div style={{ fontSize:16.5, lineHeight:1.7, color:C.tinta, display:"flex", flexDirection:"column", gap:18, textWrap:"pretty" }}>
           <p style={{ margin:0 }}>A Semana Acadêmica da Medicina é o momento em que o curso para para olhar o que produziu — e para celebrar quem produziu. Reúne estudantes, professores e a comunidade em torno do que há de mais vivo na formação médica: a pesquisa que nasce das inquietações de cada fase e amadurece até virar conhecimento compartilhado.</p>
-          <p style={{ margin:0 }}>Na XI SAM, os estudantes da 8ª fase apresentam seus Trabalhos de Curso já concluídos, em sessões orais; os da 7ª fase trazem seus projetos em pôster — os primeiros passos de pesquisas que seguirão sendo construídas. Entre uma apresentação e outra, há café, conversa e encontro, porque ciência também se faz no intervalo: na pergunta de corredor, na ideia que surge diante do trabalho do colega.</p>
+          <p style={{ margin:0 }}>Na {EDICAO_ATUAL.romano} SAM, os estudantes da 8ª fase apresentam seus Trabalhos de Curso já concluídos, em sessões orais; os da 7ª fase trazem seus projetos em pôster — os primeiros passos de pesquisas que seguirão sendo construídas. Entre uma apresentação e outra, há café, conversa e encontro, porque ciência também se faz no intervalo: na pergunta de corredor, na ideia que surge diante do trabalho do colega.</p>
           <p style={{ margin:0 }}>Mais do que uma vitrine, a SAM é formação: aprender a comunicar, a ouvir, a defender uma ideia e a acolher a crítica — ainda na graduação, aquilo que será parte da vida profissional.</p>
         </div>
 
@@ -608,7 +644,7 @@ function Sobre() {
         <div style={{ marginTop:28, background:`linear-gradient(135deg, ${C.azul}, ${C.azulEsc})`, color:"#fff", borderRadius:16, padding:"24px 26px" }}>
           <div style={{ ...linha, marginBottom:14 }}>
             <CalendarDays size={20} color={C.ciano} style={{ flexShrink:0, marginTop:1 }} />
-            <span style={{ fontSize:16, fontWeight:600 }}>Quando e onde · 22 a 26 de junho de 2026 · Rio do Sul, SC</span>
+            <span style={{ fontSize:16, fontWeight:600 }}>Quando e onde · {EDICAO_ATUAL.datasTexto} · Rio do Sul, SC</span>
           </div>
           <div style={{ ...linha, marginBottom:10 }}>
             <Users size={20} color={C.ciano} style={{ flexShrink:0, marginTop:1 }} />
@@ -626,7 +662,7 @@ function Sobre() {
           <span>Transmissão ao vivo · canal Universo UNIDAVI (YouTube) · o botão “Assistir ao vivo” aparece na programação, junto ao dia, quando a transmissão daquele dia tem link</span>
         </div>
       </div>
-      <footer style={{ textAlign:"center", padding:"24px 16px 40px", color:C.cinza, fontSize:12 }}>XI SAM 2026 · Medicina UNIDAVI</footer>
+      <footer style={{ textAlign:"center", padding:"24px 16px 40px", color:C.cinza, fontSize:12 }}>{EDICAO_ATUAL.romano} SAM 2026 · Medicina UNIDAVI</footer>
     </div>
   );
 }

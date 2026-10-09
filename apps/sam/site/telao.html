@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XI SAM 2026 · Telão da Estação</title>
+  <title>XII SAM 2026 · Telão da Estação</title>
   <!-- Recursos referenciados em JS/JSX (o bundler não os descobre sozinho) -->
   <meta name="ext-resource-dependency" content="assets/logo-unidavi.png" data-resource-id="logoUnidavi" />
   <meta name="ext-resource-dependency" content="assets/hero-desktop.jpg" data-resource-id="heroDesktop" />
@@ -95,7 +95,10 @@
       return <Home />;
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    // O programa da edição vem do banco antes da primeira tela (vazio = "em breve").
+    const raiz = ReactDOM.createRoot(document.getElementById("root"));
+    const programa = window.SAM_BACKEND && SAM_BACKEND.carregarPrograma ? SAM_BACKEND.carregarPrograma() : Promise.resolve();
+    programa.catch(() => null).then(() => raiz.render(<App />));
   </script>
 </body>
 </html>

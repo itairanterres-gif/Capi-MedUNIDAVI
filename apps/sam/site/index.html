@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XI SAM 2026 · Medicina UNIDAVI</title>
+  <title>XII SAM 2026 · Medicina UNIDAVI</title>
   <!-- Recursos referenciados em JS/JSX (o bundler não os descobre sozinho) -->
   <meta name="ext-resource-dependency" content="assets/logo-unidavi.png" data-resource-id="logoUnidavi" />
   <meta name="ext-resource-dependency" content="assets/hero-desktop.jpg" data-resource-id="heroDesktop" />
@@ -11,15 +11,15 @@
 
   <!-- Open Graph / compartilhamento (WhatsApp, etc.). og:image com URL ABSOLUTA (produção Vercel). -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="XI Semana Acadêmica da Medicina UNIDAVI" />
+  <meta property="og:title" content="XII Semana Acadêmica da Medicina UNIDAVI" />
   <meta property="og:description" content="22 a 26 de junho de 2026 · Auditório Célio Simão Martignago · Rio do Sul/SC. Transmissão ao vivo pelo Canal Universo Unidavi." />
-  <meta property="og:image" content="https://xi-sam-unidavi.vercel.app/assets/hero-desktop.png" />
+  <meta property="og:image" content="assets/xii-arte-desktop.jpg" />
   <meta property="og:image:width" content="1686" />
   <meta property="og:image:height" content="933" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="XI Semana Acadêmica da Medicina UNIDAVI" />
+  <meta name="twitter:title" content="XII Semana Acadêmica da Medicina UNIDAVI" />
   <meta name="twitter:description" content="22 a 26 de junho de 2026 · Rio do Sul/SC. Transmissão ao vivo pelo Canal Universo Unidavi." />
-  <meta name="twitter:image" content="https://xi-sam-unidavi.vercel.app/assets/hero-desktop.png" />
+  <meta name="twitter:image" content="assets/xii-arte-desktop.jpg" />
   <!-- PWA: ícone iOS, manifest e cor da barra -->
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
@@ -124,7 +124,10 @@
       return <Home />;
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    // O programa da edição vem do banco antes da primeira tela (vazio = "em breve").
+    const raiz = ReactDOM.createRoot(document.getElementById("root"));
+    const programa = window.SAM_BACKEND && SAM_BACKEND.carregarPrograma ? SAM_BACKEND.carregarPrograma() : Promise.resolve();
+    programa.catch(() => null).then(() => raiz.render(<App />));
   </script>
 </body>
 </html>

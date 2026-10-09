@@ -170,6 +170,36 @@
 
   async function sair() { await sb().auth.signOut(); }
 
+  /* Programa da edição atual (sam_programa) → window.PROGRAMA, no formato do
+     data.js: { "Seg · 23/11": { orais:[{tc,hora,area,ap,titulo,uc,id}], posteres:[{n,ap,area,titulo,id}] } }.
+     Falha ou banco vazio deixam o programa vazio ("em breve"); nunca trava a tela. */
+  async function carregarPrograma() {
+    if (modo !== "supabase" || !window.PROGRAMA || !window.DIAS) return { ok: true, itens: 0 };
+    var r = await sb().from("sam_programa")
+      .select("dia,bloco,ordem,hora,tema,apresentador,titulo,sam_trabalhos(codigo,area,prof_uc)")
+      .eq("edicao_id", cfg.edicao).order("dia").order("ordem");
+    if (r.error) return falha(r.error);
+    var n = 0;
+    r.data.forEach(function (p) {
+      var partes = String(p.dia).split("-");                     // AAAA-MM-DD
+      var chave = window.DIAS.find(function (d) { return d.indexOf(partes[2] + "/" + partes[1]) >= 0; });
+      if (!chave) return;
+      var w = p.sam_trabalhos || {};
+      var base = { ap: p.apresentador || "", titulo: p.titulo || "", area: w.area || p.tema || "" };
+      if (w.codigo) base.id = w.codigo;
+      if (p.bloco === "oral") window.PROGRAMA[chave].orais.push(Object.assign(base, { tc: p.ordem, hora: p.hora || "", uc: w.prof_uc || "" }));
+      else window.PROGRAMA[chave].posteres.push(Object.assign(base, { n: Number(String(p.ordem).replace(/[^0-9]/g, "")) || p.ordem }));
+      n++;
+    });
+    // Ordem natural (TC2 antes de TC10; P2 antes de P10).
+    var num = function (s) { return Number(String(s).replace(/[^0-9]/g, "")) || 0; };
+    window.DIAS.forEach(function (d) {
+      window.PROGRAMA[d].orais.sort(function (a, b) { return num(a.tc) - num(b.tc); });
+      window.PROGRAMA[d].posteres.sort(function (a, b) { return num(a.n) - num(b.n); });
+    });
+    return { ok: true, itens: n };
+  }
+
   window.SAM_BACKEND = {
     modo: modo,
     listarPublicados: listarPublicados,
@@ -177,7 +207,7 @@
     curadoriaListar: curadoriaListar, curadoriaDecidir: curadoriaDecidir, ehCurador: ehCurador,
     curadoriaAjustarLayout: curadoriaAjustarLayout,
     apreciar: apreciar, listarApreciacoes: listarApreciacoes,
-    sessao: sessao, urlEntrar: urlEntrar, sair: sair,
+    sessao: sessao, urlEntrar: urlEntrar, sair: sair, carregarPrograma: carregarPrograma,
     _paraSite: paraSite, _autoresDoFormulario: autoresDoFormulario,
   };
 })();

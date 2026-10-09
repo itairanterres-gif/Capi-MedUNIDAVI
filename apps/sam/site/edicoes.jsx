@@ -407,7 +407,7 @@ function EdicoesAnteriores({ atual }) {
       <div style={{ border:"1px dashed #CBD7E3", borderRadius:14, padding:"26px 22px", background:"#fff", display:"flex", gap:13, alignItems:"center", color:C.cinza }}>
         <Layers size={22} color="#B9C5D3" style={{ flexShrink:0 }} />
         <div style={{ fontSize:14, lineHeight:1.5 }}>
-          As dez edições da SAM (<strong style={{ color:C.tinta }}>I–X</strong>) já estão arquivadas — cada uma abre pela rota <code style={{ background:C.cinzaClaro, padding:"1px 6px", borderRadius:5, fontSize:12.5 }}>#/edicao/:id</code>. O índice navegável entre elas chega no próximo passo.
+          As edições anteriores da SAM (<strong style={{ color:C.tinta }}>I–XI</strong>) já estão arquivadas — cada uma abre pela rota <code style={{ background:C.cinzaClaro, padding:"1px 6px", borderRadius:5, fontSize:12.5 }}>#/edicao/:id</code>. O índice navegável entre elas chega no próximo passo.
         </div>
       </div>
     </section>
@@ -495,7 +495,7 @@ function ResultadoCruzado({ t, termo }) {
 /* painel de resultados quando o escopo é "todas as edições" */
 function BuscaTodas({ bn, termo, estado }) {
   if (!bn) return (
-    <div style={{ marginTop:24, textAlign:"center", color:C.cinza, fontSize:14 }}>Digite para buscar nas dez edições da SAM.</div>
+    <div style={{ marginTop:24, textAlign:"center", color:C.cinza, fontSize:14 }}>Digite para buscar nas edições anteriores da SAM.</div>
   );
   if (estado.carregando || !estado.lista) return <Carregando frase="Buscando em todas as edições…" style={{ padding:"34px 0" }} />;
   const res = estado.lista.filter((t) => [t.titulo, t.autor, t.area, t.orientador].some((v) => normalizaNome(v).includes(bn)));
@@ -601,7 +601,7 @@ function PaginaEdicao({ id, initialQ }) {
         <div style={{ marginTop:18 }}>
           <div style={{ position:"relative" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.cinza} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={escopo === "todas" ? "Buscar nas dez edições…" : "Buscar trabalho, autor, área ou orientador…"} aria-label="Buscar"
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={escopo === "todas" ? "Buscar nas edições anteriores…" : "Buscar trabalho, autor, área ou orientador…"} aria-label="Buscar"
               style={{ width:"100%", padding:"13px 42px", border:"1px solid #E3EAF2", borderRadius:11, fontSize:14.5, color:C.tinta, background:"#fff", boxSizing:"border-box" }} />
             {busca && <button onClick={() => setBusca("")} aria-label="Limpar" style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:30, height:30, border:"none", background:"transparent", color:C.cinza, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><X size={16} /></button>}
           </div>
