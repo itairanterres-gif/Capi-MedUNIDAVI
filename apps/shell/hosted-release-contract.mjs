@@ -32,9 +32,40 @@ export function validatePilotReadback(receipt, origin, now = Date.now()) {
       positiveJwtFlow: receipt.positiveJwtFlow, wholeCorpusValidated: false },
   };
 }
+// Liberação institucional (09/10/2026): todo aluno com matrícula, conjunto
+// completo. O que cada aluno vê continua decidido no servidor (RLS:
+// human_reviewed + student_visible + capi_amrigs_authorized()); este recibo
+// só registra que a liberação remota foi feita e conferida pelo responsável.
+export const releaseQuestionCount = 477;
+const releaseRequired = ['questionsPromoted', 'imagesDeliveryEnabled', 'bucketPrivate', 'negativeSqlVerified',
+  'studentEligibilityVerified', 'noOtherContexts', 'publicationApproved'];
+export function validateReleaseReadback(receipt, origin, now = Date.now()) {
+  if (receipt?.version !== 1 || receipt.scope !== 'release' || receipt.project !== canonicalURL ||
+      receipt.participantAccessMode !== 'institutional-learner' || receipt.origin !== origin ||
+      receipt.packageSHA256 !== packageSHA || receipt.questionCount !== releaseQuestionCount ||
+      releaseRequired.some(key => receipt.checks?.[key] !== true) ||
+      !/^[a-f0-9]{64}$/.test(receipt.policyReadbackSHA256 || '') ||
+      !['not-yet-performed', 'passed'].includes(receipt.positiveJwtFlow) ||
+      !['not-yet-performed', 'verified-all'].includes(receipt.remoteDownloadedSHA256))
+    throw new Error('AMRIGS institutional release pending: production build blocked');
+  const checked = Date.parse(receipt.checkedAt);
+  if (!Number.isFinite(checked) || checked > now) throw new Error('Release readback date invalid: production build blocked');
+  return {
+    version: 1, scope: 'release', accessMode: 'institutional-learner', state: 'released', project: canonicalURL,
+    private: true, bucket: 'capi-amrigs-private', prefix: packageSHA, questionCount: releaseQuestionCount,
+    verification: { scope: 'institutional-release', prerequisites: 'reviewed-readback', checkedAt: receipt.checkedAt,
+      remoteDownloadedSHA256: receipt.remoteDownloadedSHA256, positiveJwtFlow: receipt.positiveJwtFlow },
+  };
+}
+function readInput(name) {
+  try { return JSON.parse(readFileSync(new URL('../../build-inputs/amrigs/' + name, import.meta.url), 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+}
 export function hostedReleaseContract(env, receipt) {
   if (env.CAPI_LOCAL_PREPARATION === '1' && env.CF_PAGES !== '1' && env.CI !== 'true') return null;
   if (env.CAPI_LOCAL_PREPARATION === '1') throw new Error('Local fixture forbidden in CI/Pages');
-  const value = receipt ?? JSON.parse(readFileSync(new URL('../../build-inputs/amrigs/pilot-readback.json', import.meta.url), 'utf8'));
-  return validatePilotReadback(value, env.CAPI_PUBLIC_ORIGIN);
+  const value = receipt ?? readInput('release-readback.json') ?? readInput('pilot-readback.json');
+  return value?.scope === 'release'
+    ? validateReleaseReadback(value, env.CAPI_PUBLIC_ORIGIN)
+    : validatePilotReadback(value, env.CAPI_PUBLIC_ORIGIN);
 }

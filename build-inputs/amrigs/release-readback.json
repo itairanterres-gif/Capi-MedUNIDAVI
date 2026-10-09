@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "scope": "release",
+  "project": "https://ggjxbumtnizaeomioves.supabase.co",
+  "participantAccessMode": "institutional-learner",
+  "origin": null,
+  "packageSHA256": "0b9a12ab60d721dc0fe2268ce17df025966c0101d23269f65a1129463fa5ec40",
+  "questionCount": 477,
+  "checks": {
+    "questionsPromoted": false,
+    "imagesDeliveryEnabled": false,
+    "bucketPrivate": false,
+    "negativeSqlVerified": false,
+    "studentEligibilityVerified": false,
+    "noOtherContexts": false,
+    "publicationApproved": false
+  },
+  "policyReadbackSHA256": null,
+  "checkedAt": null,
+  "positiveJwtFlow": "not-yet-performed",
+  "remoteDownloadedSHA256": "not-yet-performed",
+  "note": "Liberação institucional do Treino AMRIGS (todo aluno com matrícula). Pendente: preencher somente após aplicar proposals/amrigs-release/01-liberar-amrigs-institucional.sql no projeto canônico, com autorização do responsável, e conferir cada item no banco real. Sem identidades, e-mails ou credenciais neste arquivo."
+}

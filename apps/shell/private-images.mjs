@@ -1,9 +1,9 @@
-import { currentPilotContract } from './pilot-runtime.mjs';
+import { currentPilotContract, imageAllowed } from './pilot-runtime.mjs';
 // Future delivery primitive: no public URLs, signed links or anonymous fallback.
 // Caller must supply the existing authenticated Supabase client and reviewed map.
 export async function downloadPrivateImage(client, contract, name, hashes) {
   if (!currentPilotContract(contract)) throw new Error('Private image contract incomplete');
-  if (!/^\d{4}\/[\w.-]+\.png$/.test(name) || !Object.hasOwn(hashes, name) || !contract.imagePaths.includes(name))
+  if (!/^\d{4}\/[\w.-]+\.png$/.test(name) || !imageAllowed(contract, name, hashes))
     throw new Error('Image outside approved manifest');
   const { data: auth, error: authError } = await client.auth.getUser();
   if (authError || !auth?.user || auth.user.is_anonymous) throw new Error('Authentication required');

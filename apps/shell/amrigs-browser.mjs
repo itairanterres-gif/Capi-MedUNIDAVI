@@ -199,7 +199,8 @@ try {
       await saveSession(); render();
     });
   });
-  if (currentPilotContract(pilotContract)) {
+  // Só o piloto tem prazo; a liberação institucional não expira no navegador.
+  if (pilotContract?.scope === 'pilot' && currentPilotContract(pilotContract)) {
     setTimeout(() => { epoch++; clearPrivateView(); set('status', 'O prazo deste piloto encerrou.'); },
       Math.max(0, Date.parse(pilotContract.expiresAt) - Date.now()));
   }
