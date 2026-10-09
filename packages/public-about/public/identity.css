@@ -1,0 +1,65 @@
+a { color: #164576; text-underline-offset: .2em; }
+.skip-link { position: absolute; left: 16px; top: -100px; padding: 12px; background: white; z-index: 2; }
+.skip-link:focus { top: 12px; }
+.product-intro { max-width: 690px; margin: -24px 0 36px; font-size: 14px; color: #52677c; }
+.product-intro p { margin: 0 0 6px; }
+.product-intro strong { font-weight: 600; color: #20354b; }
+.product-intro a { font-weight: 600; }
+footer a { display: inline-block; margin-left: 14px; }
+.about-page { max-width: 1080px; margin-top: 32px; }
+.back-link { display: inline-block; margin-bottom: 24px; font-size: 14px; }
+.about-page h1 { max-width: 780px; font-size: clamp(30px, 4vw, 44px); margin-bottom: 18px; }
+.about-page .lead { margin-bottom: 28px; }
+.perspectives { padding: 16px 0; border-top: 1px solid #c8d4df; border-bottom: 1px solid #c8d4df; }
+.perspectives p, .about-index p { font-size: 12px; font-weight: 650; margin: 0 0 10px; color: #52677c; }
+.perspectives div { display: flex; gap: 6px 20px; flex-wrap: wrap; }
+.perspectives a { padding: 6px 0; text-decoration: none; border-bottom: 2px solid transparent; font-size: 15px; }
+.perspectives a:hover { text-decoration: underline; }
+.perspectives a[aria-current="page"] { font-weight: 750; border-color: #164576; }
+.perspective-note { color: #52677c; font-size: 13px; max-width: 760px; margin: 12px 0 36px; }
+.about-layout { display: grid; grid-template-columns: 205px minmax(0, 1fr); gap: 44px; align-items: start; }
+.about-index { position: sticky; top: 24px; border-left: 1px solid #c8d4df; padding-left: 16px; }
+.about-index a { display: block; margin: 12px 0; font-size: 13px; line-height: 1.45; text-decoration: none; }
+.about-index a:hover { text-decoration: underline; }
+.about-page article { max-width: 700px; }
+.about-page article section { margin-bottom: 42px; scroll-margin-top: 24px; }
+.about-page article section:first-child h2 { margin-top: 0; }
+.about-page article h2 { font-size: 24px; letter-spacing: -.015em; }
+.about-page article p { line-height: 1.75; }
+.role-reading { padding: 22px 0; border-top: 1px solid #c8d4df; border-bottom: 1px solid #c8d4df; }
+.role-reading, #origem { display: flow-root; }
+.capi-portrait { float: right; width: 144px; height: auto; margin: 0 0 14px 24px; }
+.role-reading .eyebrow { margin: 0; }
+.role-reading h2 { margin-top: 8px; }
+.principle { color: #164576; font-size: 20px; font-weight: 600; }
+.credits dt { color: #52677c; font-size: 13px; font-weight: 650; margin: 22px 0 4px; }
+.credits dd { margin: 0; }
+.credits dd span { color: #52677c; font-size: 14px; }
+.back-top { border-top: 1px solid #c8d4df; padding-top: 20px; }
+.canon-catalogue > details, .canon-quarantine { border-top: 1px solid #c8d4df; padding: 14px 0; }
+.canon-catalogue summary, .canon-quarantine summary { cursor: pointer; line-height: 1.6; color: #164576; }
+.canon-catalogue summary:focus-visible, .canon-quarantine summary:focus-visible { outline: 2px solid #164576; outline-offset: 4px; }
+.source-status, .catalogue-note { color: #52677c; font-size: 14px; }
+.canon-catalogue a, .canon-catalogue summary { overflow-wrap: anywhere; }
+.canon-quarantine dt { font-weight: 600; margin-top: 14px; }
+.canon-quarantine dd { margin: 4px 0 12px; line-height: 1.7; }
+@media (max-width: 800px) {
+  .about-layout { grid-template-columns: 1fr; gap: 24px; }
+  .about-index { position: static; padding: 0 0 18px; border-left: 0; border-bottom: 1px solid #c8d4df; }
+  .about-index a { display: inline-block; margin: 5px 16px 5px 0; }
+}
+@media (max-width: 600px) {
+  .capi-portrait { float: none; display: block; width: 128px; margin: 0 0 18px; }
+  .product-intro { margin-top: -10px; margin-bottom: 30px; }
+  .about-page { margin-top: 24px; }
+  .about-page h1 { font-size: 32px; }
+  .perspectives div { gap: 4px 18px; }
+  footer a { display: block; margin: 12px 0 0; }
+}
+@media print {
+  .skip-link, .back-link, .perspectives, .about-index, .back-top, footer, .stage { display: none; }
+  body { background: white; color: black; }
+  .about-layout { display: block; }
+  .about-page { margin: 0; padding: 0; }
+  .about-page article { max-width: none; }
+}

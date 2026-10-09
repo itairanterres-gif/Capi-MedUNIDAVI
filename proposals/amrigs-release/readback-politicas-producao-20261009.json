@@ -1,0 +1,107 @@
+{
+ "projeto": "ggjxbumtnizaeomioves",
+ "lido_em": "2026-10-09T04:22:57.968Z",
+ "sha256": "8e066c041403dafa21928c72b56d7cd24784a6c7cfd0c130d4bc68896ab4ef5e",
+ "politicas": [
+  {
+   "cmd": "SELECT",
+   "permissive": "PERMISSIVE",
+   "policyname": "capi_image_manifest_eligible",
+   "qual": "((( SELECT auth.uid() AS uid) IS NOT NULL) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized))",
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_amrigs_image_manifest",
+   "with_check": null
+  },
+  {
+   "cmd": "INSERT",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner inserts own new AMRIGS attempt",
+   "qual": null,
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_attempts",
+   "with_check": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized) AND (legacy_source IS NULL) AND (legacy_attempt_id IS NULL) AND (legacy_user_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM capi_training_questions q\n  WHERE ((q.id = capi_training_attempts.question_id) AND (q.context = 'AMRIGS'::text) AND (q.editorial_status = 'human_reviewed'::text) AND q.student_visible))))"
+  },
+  {
+   "cmd": "SELECT",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner reads own AMRIGS attempts",
+   "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized) AND (EXISTS ( SELECT 1\n   FROM capi_training_questions q\n  WHERE ((q.id = capi_training_attempts.question_id) AND (q.context = 'AMRIGS'::text)))))",
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_attempts",
+   "with_check": null
+  },
+  {
+   "cmd": "SELECT",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner reads released AMRIGS questions",
+   "qual": "((context = 'AMRIGS'::text) AND (editorial_status = 'human_reviewed'::text) AND student_visible AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized))",
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_questions",
+   "with_check": null
+  },
+  {
+   "cmd": "DELETE",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner closes own AMRIGS session",
+   "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized))",
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_sessions",
+   "with_check": null
+  },
+  {
+   "cmd": "INSERT",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner creates own AMRIGS session",
+   "qual": null,
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_sessions",
+   "with_check": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized) AND (cardinality(question_ids) > 0) AND (NOT (EXISTS ( SELECT 1\n   FROM unnest(capi_training_sessions.question_ids) requested(id)\n  WHERE (NOT (EXISTS ( SELECT 1\n           FROM capi_training_questions q\n          WHERE ((q.id = requested.id) AND (q.context = 'AMRIGS'::text) AND (q.editorial_status = 'human_reviewed'::text) AND q.student_visible))))))))"
+  },
+  {
+   "cmd": "SELECT",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner reads own AMRIGS session",
+   "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized))",
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_sessions",
+   "with_check": null
+  },
+  {
+   "cmd": "UPDATE",
+   "permissive": "PERMISSIVE",
+   "policyname": "learner updates own AMRIGS session",
+   "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized))",
+   "roles": "{authenticated}",
+   "schemaname": "public",
+   "tablename": "capi_training_sessions",
+   "with_check": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized) AND (cardinality(question_ids) > 0) AND (NOT (EXISTS ( SELECT 1\n   FROM unnest(capi_training_sessions.question_ids) requested(id)\n  WHERE (NOT (EXISTS ( SELECT 1\n           FROM capi_training_questions q\n          WHERE ((q.id = requested.id) AND (q.context = 'AMRIGS'::text) AND (q.editorial_status = 'human_reviewed'::text) AND q.student_visible))))))))"
+  },
+  {
+   "cmd": "SELECT",
+   "permissive": "PERMISSIVE",
+   "policyname": "capi_images_authenticated_download",
+   "qual": "(bucket_id = 'capi-amrigs-private'::text)",
+   "roles": "{authenticated}",
+   "schemaname": "storage",
+   "tablename": "objects",
+   "with_check": null
+  },
+  {
+   "cmd": "ALL",
+   "permissive": "RESTRICTIVE",
+   "policyname": "capi_images_private_guard",
+   "qual": "((bucket_id <> 'capi-amrigs-private'::text) OR ((( SELECT auth.uid() AS uid) IS NOT NULL) AND storage.allow_only_operation('object.get_authenticated'::text) AND ( SELECT capi_amrigs_authorized() AS capi_amrigs_authorized) AND (EXISTS ( SELECT 1\n   FROM (capi_amrigs_image_manifest m\n     JOIN capi_training_questions q ON (((q.context = 'AMRIGS'::text) AND (q.editorial_status = 'human_reviewed'::text) AND q.student_visible)))\n  WHERE (m.delivery_enabled AND (m.object_name = objects.name) AND (EXISTS ( SELECT 1\n           FROM jsonb_array_elements(\n                CASE\n                    WHEN (jsonb_typeof((q.body -> 'images'::text)) = 'array'::text) THEN (q.body -> 'images'::text)\n                    ELSE '[]'::jsonb\n                END) image(value)\n          WHERE ((image.value ->> 'url'::text) = ('/amrigs/'::text || m.legacy_path)))))))))",
+   "roles": "{public}",
+   "schemaname": "storage",
+   "tablename": "objects",
+   "with_check": "(bucket_id <> 'capi-amrigs-private'::text)"
+  }
+ ]
+}

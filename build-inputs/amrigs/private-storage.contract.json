@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "state": "unprovisioned",
+  "project": "https://ggjxbumtnizaeomioves.supabase.co",
+  "private": true,
+  "bucket": null,
+  "prefix": "0b9a12ab60d721dc0fe2268ce17df025966c0101d23269f65a1129463fa5ec40",
+  "delivery": "authenticated-download",
+  "authorizationRequired": ["current auth.uid", "institutional eligibility", "linked released AMRIGS question"],
+  "anonymousRead": false,
+  "browserWrites": false,
+  "publicOrSignedFallback": false
+}

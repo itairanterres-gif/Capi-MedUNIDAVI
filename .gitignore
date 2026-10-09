@@ -40,3 +40,17 @@ allowlists/
 Thumbs.db
 .idea/
 .vscode/
+node_modules/
+apps/shell/dist/
+apps/shell/hosted-dist/
+apps/shell/hosted-dist-first/
+apps/shell/vercel.candidate.json
+apps/shell/pages.candidate.json
+apps/sessao/dist-pages/
+*.tsbuildinfo
+*TESTS.txt
+*BUILD*.log
+RESULTADOS-GIT-LOCAL.json
+
+.local-assets/
+build-inputs/amrigs/images/

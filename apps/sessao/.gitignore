@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-hosted-candidate/
+.env
+.env.local
+*.local
+*.tsbuildinfo
+
+# patches de entrega (o commit ja carrega o conteudo)
+*.patch
+
+senhas-*.csv

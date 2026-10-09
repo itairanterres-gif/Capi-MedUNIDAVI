@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "scope": "release",
+  "project": "https://ggjxbumtnizaeomioves.supabase.co",
+  "participantAccessMode": "institutional-learner",
+  "origin": "https://capi-medunidavi.pages.dev",
+  "packageSHA256": "0b9a12ab60d721dc0fe2268ce17df025966c0101d23269f65a1129463fa5ec40",
+  "questionCount": 477,
+  "checks": {
+    "questionsPromoted": true,
+    "imagesDeliveryEnabled": true,
+    "bucketPrivate": true,
+    "negativeSqlVerified": true,
+    "studentEligibilityVerified": true,
+    "noOtherContexts": true,
+    "publicationApproved": true
+  },
+  "policyReadbackSHA256": "8e066c041403dafa21928c72b56d7cd24784a6c7cfd0c130d4bc68896ab4ef5e",
+  "checkedAt": "2026-10-09T04:22:42Z",
+  "positiveJwtFlow": "not-yet-performed",
+  "remoteDownloadedSHA256": "not-yet-performed",
+  "note": "Liberação institucional aplicada no projeto canônico em 2026-10-09 com autorização do professor (passos 1 e 2). Conferido no banco real: 477 questões AMRIGS human_reviewed+student_visible, 0 ocultas; 31 figuras delivery_enabled; 0 questões visíveis de outros contextos; bucket capi-amrigs-private privado (31 objetos); visitante sem login recebe 401 em questões/manifesto e negação nas figuras; elegibilidade = profiles.role aluno + matrícula; políticas em proposals/amrigs-release/readback-politicas-producao-20261009.json. AINDA NÃO FEITO: fluxo positivo com aluno real e conferência SHA das figuras baixadas. Sem identidades ou credenciais neste arquivo."
+}

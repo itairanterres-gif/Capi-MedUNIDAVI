@@ -1,0 +1,2 @@
+build-inputs/amrigs/manifest.json text eol=lf
+*.png -text
