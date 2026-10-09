@@ -28,3 +28,9 @@ test('AMRIGS page has a hidden docent catalog that never offers answering', () =
   assert.match(catalogo, /não registra respostas/);
   assert.ok(!/type="radio"|Confirmar resposta/.test(catalogo));
 });
+
+test('a figure that fails to load never traps the learner: skip button and note exist, hidden by default', () => {
+  const html = renderAmrigsPilot(true);
+  assert.match(html, /<button id="amrigs-skip" type="button" hidden>Pular esta questão<\/button>/);
+  assert.match(html, /<p id="amrigs-figure-note" class="figure-note" role="status" hidden><\/p>/);
+});

@@ -59,10 +59,19 @@ function renderQuestion(q) {
   set('title', b.stem); set('source', `${b.area || ''} · ${b.source || 'AMRIGS'}`);
   imagesReady = false;
   const button = el('form').querySelector('button'); button.disabled = true;
+  el('skip').hidden = true; show('figure-note', false);
   const required = b.images || [];
   const mounted = imageView.mount(required, { onReady(ok) {
-    imagesReady = ok && (!b.alternativesInImage || required.length > 0);
+    // Figura que não carrega não pode travar a sessão: se as alternativas estão
+    // no texto, o aluno responde pelo enunciado; se estão na figura, pula.
+    imagesReady = ok || !b.alternativesInImage;
     button.disabled = finished || !imagesReady;
+    const falhou = !ok && required.length > 0 && !finished;
+    el('skip').hidden = !falhou;
+    show('figure-note', falhou);
+    if (falhou) set('figure-note', b.alternativesInImage
+      ? 'A figura desta questão não carregou e as alternativas estão nela. Use "Pular esta questão" para seguir.'
+      : 'A figura não carregou. Você pode responder pelo enunciado ou pular esta questão.');
   } });
   el('images').replaceChildren(...mounted.nodes);
   const latest = latestAttempts(attempts).get(q.id);
@@ -73,6 +82,11 @@ function renderQuestion(q) {
     span.textContent = `${a.id}. ${b.alternativesInImage ? `Alternativa ${a.id} na figura` : a.text}`;
     label.append(radio, span);
     if (finished && a.rationale) { const detail = document.createElement('small'); detail.textContent = a.rationale; label.append(detail); }
+    // Depois de responder: correta em verde; escolhida errada em vermelho.
+    if (finished) {
+      if (a.id === b.correct) { label.classList.add('alt-correta'); span.textContent += ' — gabarito'; }
+      else if (latest?.answer === a.id) { label.classList.add('alt-errada'); span.textContent += ' — sua resposta'; }
+    }
     return label;
   }));
   show('form', true); el('form').querySelector('button').hidden = finished;
@@ -241,6 +255,15 @@ try {
     });
   });
   el('next').addEventListener('click', () => { feedbackId = null; render(); });
+  // Pular: tira a questão desta sessão (sem registrar tentativa) e segue.
+  el('skip').addEventListener('click', event => {
+    void busy(event.currentTarget, async () => {
+      const id = pending(session).find(value => byId().has(value));
+      if (!id) return;
+      session.questionIds = session.questionIds.filter(value => value !== id);
+      await saveSession(); feedbackId = null; render();
+    });
+  });
   el('catalog-form').addEventListener('input', () => { catalogShown = CATALOGO_PAGINA; imageView.clear(); renderCatalog(); });
   el('catalog-form').addEventListener('submit', event => event.preventDefault());
   el('catalog-more').addEventListener('click', () => { catalogShown += CATALOGO_PAGINA; renderCatalog(); });

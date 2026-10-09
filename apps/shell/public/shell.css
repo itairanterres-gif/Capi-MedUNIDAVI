@@ -50,3 +50,6 @@
 .login .login-links { font-size: 15px; }
 .login form h2 { margin-top: 0; }
 .login #google { width: 100%; margin-bottom: 6px; }
+.amrigs .figure-note { background: #fff7e6; border: 1px solid #f0d9a0; border-radius: 6px; padding: 10px 12px; color: #7a5a12; }
+.amrigs fieldset label.alt-correta { border-color: #1f8a5b; background: #e7f5ee; box-shadow: inset 4px 0 0 #1f8a5b; }
+.amrigs fieldset label.alt-errada { border-color: #c0392b; background: #fbeae8; box-shadow: inset 4px 0 0 #c0392b; }
