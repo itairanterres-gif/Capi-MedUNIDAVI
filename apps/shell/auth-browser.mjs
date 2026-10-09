@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { canonicalURL, storageKey, resolveIdentity } from './auth-contract.mjs';
 
 import {loginDestination,clearDestination} from './login-destination.mjs';
+import { activitiesFor } from './activities.mjs';
 let destination=loginDestination(location.search,sessionStorage);
 const message = document.querySelector('#auth-message');
 const form = document.querySelector('#login-form');
@@ -12,6 +13,20 @@ const logout = document.querySelector('#logout');
 let client;
 let generation = 0;
 let recovery = false;
+let amrigsOn = false;
+const activities = document.querySelector('#activities');
+// Lista de atividades por papel, montada com DOM (sem HTML injetado).
+function renderActivities(identity) {
+  activities.replaceChildren();
+  const lista = identity ? activitiesFor(identity.role, { amrigs: amrigsOn }) : [];
+  for (const item of lista) {
+    const a = document.createElement('a'); a.href = item.href; a.className = 'activity';
+    const t = document.createElement('strong'); t.textContent = item.label;
+    const h = document.createElement('span'); h.textContent = item.hint;
+    a.append(t, h); activities.append(a);
+  }
+  activities.hidden = lista.length === 0;
+}
 function show(text) { message.textContent = text; }
 async function refresh() {
   const turn = ++generation;
@@ -22,13 +37,16 @@ async function refresh() {
     form.hidden = !!identity;
     logout.hidden = !identity;
     account.textContent = identity ? `${identity.name} · ${identity.label}` : '';
-    launch.hidden = !identity;
+    renderActivities(identity);
+    // Sem destino específico, a lista por papel substitui o salto direto à Sessão.
+    launch.hidden = !identity || (destination === '/questoes/' && !activities.hidden);
     show(identity ? 'Sua conta está conectada. Você pode abrir suas atividades.' : 'Entre com sua conta já existente.');
     document.querySelector('#account-about').href = identity?.perspective ? '/sobre?papel=' + identity.perspective : '/sobre';
     if (recovery && identity) window.location.replace('/questoes/?capi_recovery=1');
   } catch {
     if (turn !== generation) return;
     account.textContent = '';
+    renderActivities(null);
     form.hidden = true;
     logout.hidden = false;
     show('Não foi possível validar sua conta e seu acesso. Tente novamente ou saia para entrar de novo.');
@@ -44,6 +62,7 @@ try {
   const response = await fetch('/auth-config.json', { cache: 'no-store' });
   if (!response.ok) throw new Error();
   const config = await response.json();
+  amrigsOn = !!config.amrigsPilot;
   const local = /^http:\/\/127\.0\.0\.1:\d+$/.test(config.url) && config.storageKey === 'sb-capi-local-auth-token';
   if (!local && (config.url !== canonicalURL || config.storageKey !== storageKey)) throw new Error();
   if (destination === '/amrigs/' && !config.amrigsPilot) destination = '/questoes/';
