@@ -28,13 +28,13 @@ const AREA_COR = {
 };
 
 /* EDIÇÃO ATUAL (viva). As anteriores, inclusive a XI, estão no arquivo
-   (*_sam.json). Datas e dias vêm daqui; local fica vazio até ser confirmado. */
+   (*_sam.json). Datas e dias vêm daqui; local confirmado pelo Itairan em 09/10/2026 (o mesmo da XI). */
 const EDICAO_ATUAL = {
   id: "xii", romano: "XII", numero: 12,
   nome: "Semana Acadêmica da Medicina UNIDAVI",
   datasTexto: "23 a 27 de novembro de 2026",
   dataInicio: "2026-11-23", dataFim: "2026-11-27",
-  local: "",
+  local: "Auditório Célio Simão Martignago",
 };
 
 const DIAS = ["Seg · 23/11", "Ter · 24/11", "Qua · 25/11", "Qui · 26/11", "Sex · 27/11"];
