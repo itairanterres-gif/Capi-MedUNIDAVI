@@ -11,7 +11,6 @@ test('publication mode refuses placeholder origins, fixture credentials and unkn
   await assert.rejects(buildHosted({ ...base, CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' }), /production build blocked/);
   await assert.rejects(buildHosted({ ...base, CAPI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' }), /production build blocked/);
   await assert.rejects(buildHosted({ ...base, CAPI_HOSTING_TARGET: 'unknown' }), /production build blocked/);
-  await assert.rejects(buildHosted({ ...base, CAPI_HOSTING_TARGET: 'cloudflare-pages', CAPI_GOOGLE_ENABLED: '1' }), /production build blocked/);
 });
 test('future origin is explicit HTTPS, not tied to the superseded Vercel origin', () => {
   assert.equal(validateHostedOrigin(env('https://approved-host.unidavi.edu.br')), 'https://approved-host.unidavi.edu.br');

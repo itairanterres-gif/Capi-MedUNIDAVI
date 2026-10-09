@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Coordenacao } from './features/admin/Coordenacao'
 import { Home } from './features/Home'
@@ -18,6 +19,11 @@ import { CAPI_INTEGRATED } from './lib/capiIntegration'
 import { AuthProvider } from './features/auth/AuthContext'
 import { RequireAdmin, RequireAuth, RequireStaff } from './features/auth/guards'
 
+function IrParaAtividades() {
+  useEffect(() => { window.location.replace('/entrar/') }, [])
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -29,7 +35,8 @@ export default function App() {
           </div>
         )}
         <Routes>
-          <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
+          {/* No Capi, o início da Sessão é a lista "Suas atividades" do /entrar. */}
+          <Route path="/" element={CAPI_INTEGRATED ? <IrParaAtividades /> : <RequireAuth><Home /></RequireAuth>} />
           <Route path="/coordenacao" element={<RequireAdmin><Coordenacao /></RequireAdmin>} />
           <Route path="/professor" element={<RequireStaff><ProfessorHome /></RequireStaff>} />
           <Route path="/professor/nova" element={<RequireStaff><NovaSessao /></RequireStaff>} />

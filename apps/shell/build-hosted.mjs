@@ -17,8 +17,6 @@ export async function buildHosted(env = process.env) {
   if (env.CAPI_LOCAL_PREPARATION !== '1' && /fixture|synthetic/.test(env.CAPI_SUPABASE_PUBLISHABLE_KEY || ''))
     throw new Error('Fixture key is local preparation only');
   if (!['cloudflare-pages', 'vercel', undefined].includes(env.CAPI_HOSTING_TARGET)) throw new Error('Unsupported hosting target');
-  if (env.CAPI_HOSTING_TARGET === 'cloudflare-pages' && env.CAPI_GOOGLE_ENABLED === '1')
-    throw new Error('Google OAuth is outside the Pages preparation scope');
   const integration = await loadIntegration(env);
   if (!integration?.amrigsHosted) throw new Error('Hosted integration required');
   const output = fileURLToPath(new URL('./hosted-dist/', import.meta.url));
@@ -55,7 +53,6 @@ export async function buildHosted(env = process.env) {
       ] }],
     };
     if (env.CAPI_HOSTING_TARGET === 'cloudflare-pages') {
-      if (integration.googleEnabled) throw new Error('Google OAuth is outside the Pages preparation scope');
       await writeFile(path.join(output, '_headers'), pagesHeaders(integration.url));
       await writeFile(path.join(output, '_redirects'), pagesRedirects);
       await writeFile(path.join(output, '404.html'), notFoundHTML);

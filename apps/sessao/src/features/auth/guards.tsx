@@ -9,6 +9,17 @@ import { ADMIN_DEMO, ehAdmin, ehStaff, PROFESSOR_DEMO } from '../../lib/identity
 import { useAuth } from './AuthContext'
 import { Login } from './Login'
 import { TrocarSenha } from './TrocarSenha'
+import { CAPI_INTEGRATED } from '../../lib/capiIntegration'
+
+// Dentro do Capi, a entrada é única: sem sessão, volta ao /entrar do Capi e
+// retorna depois para a mesma tela da Sessão.
+export function EntrarPeloCapi() {
+  useEffect(() => {
+    window.location.replace('/entrar/?next=' + encodeURIComponent('/questoes/' + window.location.hash))
+  }, [])
+  return <Spinner />
+}
+const SemSessao = () => (CAPI_INTEGRATED ? <EntrarPeloCapi /> : <Login />)
 
 // Enquanto a senha inicial não for trocada, NADA do app abre. Fica numa
 // função só para os três guards compartilharem a mesma regra — senão bastaria
@@ -50,7 +61,7 @@ export function RequireStaff({ children }: { children: ReactNode }) {
   }
 
   if (carregando) return <Spinner />
-  if (!identidade) return <Login />
+  if (!identidade) return <SemSessao />
   if (recuperandoSenha) return <TrocarSenha motivo="recuperacao" />
   if (precisaTrocarSenha(identidade)) return <TrocarSenha />
   if (!ehStaff(identidade)) {
@@ -78,7 +89,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   }
 
   if (carregando) return <Spinner />
-  if (!identidade) return <Login />
+  if (!identidade) return <SemSessao />
   if (recuperandoSenha) return <TrocarSenha motivo="recuperacao" />
   if (precisaTrocarSenha(identidade)) return <TrocarSenha />
   if (!ehAdmin(identidade)) {
@@ -97,7 +108,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (modo === 'demo') return <>{children}</>
 
   if (carregando) return <Spinner />
-  if (!identidade) return <Login />
+  if (!identidade) return <SemSessao />
   if (recuperandoSenha) return <TrocarSenha motivo="recuperacao" />
   if (precisaTrocarSenha(identidade)) return <TrocarSenha />
   return <>{children}</>
