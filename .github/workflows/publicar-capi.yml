@@ -33,7 +33,10 @@ jobs:
         env:
           CAPI_PUBLIC_ORIGIN: https://capi-medunidavi.pages.dev
           CAPI_APPROVED_PUBLIC_ORIGIN: https://capi-medunidavi.pages.dev
-          CAPI_SUPABASE_PUBLISHABLE_KEY: ${{ vars.CAPI_SUPABASE_PUBLISHABLE_KEY }}
+          # Chave PÚBLICA (publishable) do Supabase canônico: a mesma servida a
+          # qualquer visitante em /auth-config.json. Não é segredo; fica aqui para o
+          # build não depender de configuração manual do repositório.
+          CAPI_SUPABASE_PUBLISHABLE_KEY: sb_publishable_NX-BOzVTviT54HuFSpguHA_4TOYPGpc
 
       - name: Testes
         run: node --test apps/shell/test/*.test.mjs scripts/*.test.mjs
