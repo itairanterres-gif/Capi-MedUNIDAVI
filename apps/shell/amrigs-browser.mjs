@@ -82,6 +82,11 @@ function renderQuestion(q) {
     span.textContent = `${a.id}. ${b.alternativesInImage ? `Alternativa ${a.id} na figura` : a.text}`;
     label.append(radio, span);
     if (finished && a.rationale) { const detail = document.createElement('small'); detail.textContent = a.rationale; label.append(detail); }
+    // Depois de responder: correta em verde; escolhida errada em vermelho.
+    if (finished) {
+      if (a.id === b.correct) { label.classList.add('alt-correta'); span.textContent += ' — gabarito'; }
+      else if (latest?.answer === a.id) { label.classList.add('alt-errada'); span.textContent += ' — sua resposta'; }
+    }
     return label;
   }));
   show('form', true); el('form').querySelector('button').hidden = finished;
