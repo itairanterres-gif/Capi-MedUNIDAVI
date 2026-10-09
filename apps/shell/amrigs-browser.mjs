@@ -3,7 +3,7 @@ import { createPrivateImageView } from './private-image-ui.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { resolveIdentity } from './auth-contract.mjs';
 import { validateAuthConfig } from './config-contract.mjs';
-import { buildSession, errorNotebook, filterPool, latestAttempts, pending, validQuestion } from './amrigs-core.mjs';
+import { buildSession, catalogFilter, errorNotebook, filterPool, latestAttempts, pending, questionYear, validQuestion } from './amrigs-core.mjs';
 
 const el = id => document.getElementById(`amrigs-${id}`);
 const show = (id, yes) => { el(id).hidden = !yes; };
@@ -17,8 +17,8 @@ function option(label, value) { return new Option(label, value); }
 function imageNodes(images) { return imageView.mount(images).nodes; }
 function clearPrivateView() {
   imageView?.clear(); imagesReady = false;
-  for (const id of ['setup', 'activity', 'summary', 'notebook']) show(id, false);
-  el('images').replaceChildren(); el('errors').replaceChildren();
+  for (const id of ['setup', 'activity', 'summary', 'notebook', 'catalog']) show(id, false);
+  el('images').replaceChildren(); el('errors').replaceChildren(); el('catalog-list').replaceChildren();
   el('form').querySelector('button').disabled = true;
 }
 function setupOptions() {
@@ -99,11 +99,53 @@ function renderSummary() {
     const p = document.createElement('p'); p.textContent = `${area}: ${n.correct}/${n.total}`; return p;
   }));
 }
+// ---------- Catálogo docente (consulta; nenhuma tentativa é gravada) ----------
+const CATALOGO_PAGINA = 30;
+let catalogShown = CATALOGO_PAGINA;
+function catalogSetup() {
+  const f = el('catalog-form').elements;
+  const areas = [...new Set(questions.map(q => q.body.area).filter(Boolean))].sort();
+  const years = [...new Set(questions.map(questionYear).filter(Boolean))].sort().reverse();
+  f.area.replaceChildren(option('Todas', ''), ...areas.map(a => option(a, a)));
+  f.year.replaceChildren(option('Todos', ''), ...years.map(y => option(String(y), String(y))));
+}
+function catalogItem(q) {
+  const b = q.body, details = document.createElement('details'), summary = document.createElement('summary');
+  details.className = 'amrigs-catalog-item';
+  summary.textContent = `${b.source || 'AMRIGS'} · ${b.area || 'Área não classificada'}${b.topic ? ' · ' + b.topic : ''}`;
+  details.append(summary);
+  // Conteúdo e figuras só quando o docente abre a questão (evita baixar tudo).
+  details.addEventListener('toggle', () => {
+    if (!details.open || details.dataset.montado) return;
+    details.dataset.montado = '1';
+    const stem = document.createElement('p'); stem.textContent = b.stem;
+    details.append(stem, ...imageNodes(b.images));
+    for (const a of b.alternatives) {
+      const div = document.createElement('div'), texto = document.createElement('span');
+      div.className = 'alt' + (a.id === b.correct ? ' correta' : '');
+      texto.textContent = `${a.id}. ${b.alternativesInImage ? 'Alternativa ' + a.id + ' na figura' : a.text}${a.id === b.correct ? ' — gabarito' : ''}`;
+      div.append(texto);
+      if (a.rationale) { const s = document.createElement('small'); s.textContent = a.rationale; div.append(s); }
+      details.append(div);
+    }
+    if (b.pearl) { const p = document.createElement('p'); p.className = 'perola'; p.textContent = b.pearl; details.append(p); }
+  });
+  return details;
+}
+function renderCatalog() {
+  for (const id of ['setup', 'activity', 'summary', 'notebook']) show(id, false);
+  show('catalog', true);
+  const f = el('catalog-form').elements;
+  const lista = catalogFilter(questions, { area: f.area.value, year: f.year.value, q: f.q.value });
+  set('catalog-count', `${lista.length} de ${questions.length} questões.`);
+  el('catalog-list').replaceChildren(...lista.slice(0, catalogShown).map(catalogItem));
+  el('catalog-more').hidden = lista.length <= catalogShown;
+}
 function render() {
   imageView?.clear(); imagesReady = false;
   for (const id of ['setup', 'activity', 'summary', 'notebook']) show(id, false);
-  if (!questions.length) { set('status', 'O treino AMRIGS ainda não foi publicado para estudantes neste ambiente.'); return; }
-  set('status', `${questions.length} questão(ões) liberada(s) neste ambiente de homologação.`);
+  if (!questions.length) { set('status', 'O treino AMRIGS ainda não está disponível para a sua conta.'); return; }
+  set('status', `${questions.length} questões disponíveis para treino.`);
   renderNotebook();
   if (!session) { show('setup', true); setupOptions(); el('setup-form').dispatchEvent(new Event('change')); return; }
   const lookup = byId(), next = pending(session).find(id => lookup.has(id));
@@ -129,6 +171,15 @@ async function refresh() {
     if (current !== epoch) return;
     if (!identity) { location.replace('/entrar?next=%2Famrigs%2F'); return; }
     set('account', `${identity.name} · ${identity.label}`);
+    if (['professor', 'admin'].includes(identity.role)) {
+      const q = await client.from('capi_training_questions').select('id,body').eq('context', 'AMRIGS').eq('editorial_status', 'human_reviewed').eq('student_visible', true);
+      if (q.error) throw q.error;
+      if (current !== epoch) return;
+      questions = q.data.filter(validQuestion).filter(value => pilotQuestionAllowed(pilotContract, value.id));
+      if (!questions.length) { set('status', 'O catálogo docente ainda não está disponível para a sua conta.'); return; }
+      set('status', 'Catálogo docente: consulta às questões liberadas para os alunos.');
+      catalogShown = CATALOGO_PAGINA; catalogSetup(); renderCatalog(); return;
+    }
     if (!['aluno', 'egresso'].includes(identity.role)) { set('status', 'O treino está disponível somente para estudantes.'); return; }
     const [q, a, s] = await Promise.all([
       client.from('capi_training_questions').select('id,body').eq('context', 'AMRIGS').eq('editorial_status', 'human_reviewed').eq('student_visible', true),
@@ -190,6 +241,9 @@ try {
     });
   });
   el('next').addEventListener('click', () => { feedbackId = null; render(); });
+  el('catalog-form').addEventListener('input', () => { catalogShown = CATALOGO_PAGINA; imageView.clear(); renderCatalog(); });
+  el('catalog-form').addEventListener('submit', event => event.preventDefault());
+  el('catalog-more').addEventListener('click', () => { catalogShown += CATALOGO_PAGINA; renderCatalog(); });
   el('abandon').addEventListener('click', event => { void busy(event.currentTarget, closeSession); });
   el('new').addEventListener('click', event => { void busy(event.currentTarget, closeSession); });
   el('review').addEventListener('click', event => {

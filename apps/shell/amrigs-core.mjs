@@ -55,3 +55,13 @@ export function validQuestion(q) {
     && Array.isArray(b.alternatives) && b.alternatives.length >= 2
     && b.alternatives.every(a => ['A', 'B', 'C', 'D'].includes(a?.id) && typeof a.text === 'string'));
 }
+// Catálogo docente: filtra por área, ano (da fonte "AMRIGS · 2019 · …") e
+// texto livre (enunciado, tema, área), sem acentos e sem diferença de caixa.
+const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+export function questionYear(q) { return Number(q.body?.source?.match(/AMRIGS · (\d{4}) ·/)?.[1]) || null; }
+export function catalogFilter(questions, { area = '', year = '', q = '' } = {}) {
+  const termo = semAcento(q).trim();
+  return questions.filter(item => (!area || item.body.area === area) && (!year || questionYear(item) === Number(year)) &&
+    (!termo || semAcento([item.body.stem, item.body.topic, item.body.area].join(' ')).includes(termo)))
+    .sort((a, b) => (questionYear(b) || 0) - (questionYear(a) || 0) || String(a.body.source).localeCompare(String(b.body.source), 'pt-BR', { numeric: true }));
+}
