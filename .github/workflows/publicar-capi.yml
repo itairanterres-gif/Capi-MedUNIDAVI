@@ -1,0 +1,53 @@
+# Publica o Capi MedUNIDAVI no Cloudflare Pages (projeto capi-medunidavi)
+# a cada mudança no main. O ambiente "producao" permite exigir aprovação
+# manual antes de publicar (GitHub → Settings → Environments → producao).
+name: Publicar Capi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capi-producao
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment: producao
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+
+      # O build instala as dependências pelos package-lock e recusa publicar
+      # se o recibo de liberação (build-inputs/amrigs) não estiver completo.
+      - name: Gerar o site
+        run: npm run build:pages
+        env:
+          CAPI_PUBLIC_ORIGIN: https://capi-medunidavi.pages.dev
+          CAPI_APPROVED_PUBLIC_ORIGIN: https://capi-medunidavi.pages.dev
+          CAPI_SUPABASE_PUBLISHABLE_KEY: ${{ vars.CAPI_SUPABASE_PUBLISHABLE_KEY }}
+
+      - name: Testes
+        run: node --test apps/shell/test/*.test.mjs scripts/*.test.mjs
+
+      - name: Conferir o pacote (sem figuras, segredos ou ENAMED)
+        run: |
+          set -e
+          D=apps/shell/hosted-dist
+          test "$(find $D -name '*.png' | wc -l)" = 0
+          ! grep -rlE 'sb_secret_[A-Za-z0-9_-]{8,}|BEGIN .*PRIVATE KEY' $D
+          ! grep -rli 'enamed' $D
+
+      - name: Publicar no Cloudflare Pages
+        run: npx --yes wrangler@3.114.0 pages deploy apps/shell/hosted-dist --project-name capi-medunidavi --branch main --commit-hash "${{ github.sha }}" --commit-message "GitHub ${{ github.sha }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
