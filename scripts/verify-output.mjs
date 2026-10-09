@@ -35,7 +35,7 @@ assert.equal(Object.keys(images).length, 31);
 assert.ok(!files.some(name => /^amrigs\/\d{4}\//.test(name)));
 const config = JSON.parse(await readFile(path.join(output, 'auth-config.json')));
 assert.equal(config.url, canonicalURL); assert.equal(config.storageKey, storageKey);
-assert.equal(config.key, 'sb_publishable_fixture'); assert.equal(config.googleEnabled, false);
+assert.equal(config.key, 'sb_publishable_fixture'); assert.equal(config.googleEnabled, true);
 for (const name of ['index.html', 'sobre/index.html', 'entrar/index.html', 'questoes/index.html', 'amrigs/index.html', '_headers', '_redirects', '404.html']) assert.ok(files.includes(name));
 const report = { status: 'PASS', build: 'npm run build:pages:fixture',
   productionBuildCommand: 'npm run build:pages', output: 'apps/shell/hosted-dist',

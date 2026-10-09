@@ -14,7 +14,7 @@ export function buildPlan(root, input, { fixture = false } = {}) {
     CAPI_APPROVED_PUBLIC_ORIGIN: fixture ? origin : input.CAPI_APPROVED_PUBLIC_ORIGIN,
     CAPI_LOCAL_PREPARATION: fixture ? '1' : '0',
     CAPI_SHARED_LOGIN: '1', CAPI_AMRIGS_HOSTED: '1', CAPI_HOSTING_TARGET: 'cloudflare-pages',
-    CAPI_SUPABASE_PUBLISHABLE_KEY: key, CAPI_GOOGLE_ENABLED: '0', CAPI_LOCAL_SUPABASE_URL: '', CAPI_AMRIGS_PILOT: '0',
+    CAPI_SUPABASE_PUBLISHABLE_KEY: key, CAPI_GOOGLE_ENABLED: '1', CAPI_LOCAL_SUPABASE_URL: '', CAPI_AMRIGS_PILOT: '0',
     CAPI_QUESTOES_DIST: path.join(root, 'apps/sessao/dist-pages'),
     CAPI_AMRIGS_MANIFEST: path.join(root, 'build-inputs/amrigs/manifest.json'),
     CAPI_AMRIGS_ASSETS: '', CAPI_AMRIGS_PACKAGE: '',

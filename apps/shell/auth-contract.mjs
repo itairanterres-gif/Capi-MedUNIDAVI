@@ -14,5 +14,7 @@ export async function resolveIdentity(client) {
   if (profileError || !profile || profile.id !== data.user.id || !Object.hasOwn(roles, profile.role))
     throw new Error('PROFILE_UNAVAILABLE');
   return { subject: profile.id, name: profile.nome || 'Sua conta', role: profile.role,
-    label: roles[profile.role], perspective: profile.role === 'aluno' ? 'estudante' : profile.role === 'professor' ? 'docente' : null };
+    label: roles[profile.role], perspective: profile.role === 'aluno' ? 'estudante' : profile.role === 'professor' ? 'docente' : null,
+    // Contas criadas pela coordenação com senha inicial precisam trocá-la (regra da Sessão).
+    senhaDefinida: profile.senha_definida !== false };
 }

@@ -46,3 +46,7 @@
 .amrigs-catalog-item .alt.correta { background: #e7f5ee; border-left: 4px solid #1f8a5b; }
 .amrigs-catalog-item .alt small { display: block; color: #41576d; margin-top: 4px; }
 .amrigs-catalog-item .perola { font-style: italic; color: #41576d; }
+.login button.link { background: none; border: 0; padding: 0; margin: 0; color: #164576; text-decoration: underline; cursor: pointer; font: inherit; }
+.login .login-links { font-size: 15px; }
+.login form h2 { margin-top: 0; }
+.login #google { width: 100%; margin-bottom: 6px; }
