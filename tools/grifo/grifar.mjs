@@ -15,7 +15,7 @@ import path from 'node:path';
 const MODELO = process.env.GRIFO_MODELO || 'claude-opus-5-5';
 const VERIFICADOR = process.env.GRIFO_VERIFICADOR || 'claude-sonnet-5-5';
 
-async function chave() {
+export async function chave() {
   if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
   const env = await readFile(path.join(process.env.LOCALAPPDATA, 'hermes', '.env'), 'utf8');
   const m = env.match(/^\s*ANTHROPIC_API_KEY\s*=\s*["']?([^"'\r\n]+)["']?\s*$/m);
@@ -24,7 +24,7 @@ async function chave() {
 }
 
 // Regras da skill "analise-questoes-residencia" v1.3, seção 15A (Codex, 30/09/2026).
-const REGRAS = `Você é professor de medicina revisando questões de residência já respondidas pelo estudante.
+export const REGRAS = `Você é professor de medicina revisando questões de residência já respondidas pelo estudante.
 Tarefa: marcar as PISTAS-CHAVE do enunciado — uma camada editorial vinculada ao texto oficial, não uma
 reescrita nem uma dica acrescentada. Elas ensinam a separar dados discriminativos de contexto e só
 aparecem DEPOIS da primeira resposta (gabarito e justificativa abaixo).
@@ -59,14 +59,14 @@ async function chamar(apiKey, modelo, system, user, maxTokens = 800) {
   }
 }
 
-function json(texto) {
+export function json(texto) {
   const i = texto.indexOf('{'), j = texto.lastIndexOf('}');
   if (i < 0 || j < i) throw new Error('resposta sem JSON: ' + texto.slice(0, 160).replace(/s+/g, ' '));
   return JSON.parse(texto.slice(i, j + 1));
 }
 
 // Último período do enunciado = comando (ex.: "...é:" ou "...provável?").
-function comando(stem) {
+export function comando(stem) {
   const partes = stem.trim().split(/(?<=[.!?])\s+/);
   return partes[partes.length - 1];
 }
@@ -89,7 +89,7 @@ export function validarPistas(stem, pistas) {
   return { pistas: ok.slice(0, 3), descartes };
 }
 
-const VERIFICA = `Você recebe apenas algumas PISTAS de um caso clínico, o COMANDO da questão e as alternativas.
+export const VERIFICA = `Você recebe apenas algumas PISTAS de um caso clínico, o COMANDO da questão e as alternativas.
 Usando só essas informações e conhecimento médico, qual alternativa é a correta?
 Responda SOMENTE com JSON: {"letra":"X","confianca":"alta|media|baixa"}`;
 
