@@ -13,12 +13,6 @@ import { CapiCards } from './features/cards/CapiCards'
 import { Importacao } from './features/importacao/Importacao'
 import { PortaA } from './features/importacao/PortaA'
 import { PortaB } from './features/importacao/PortaB'
-import { MinhasEnquetes } from './features/enquete-professor/MinhasEnquetes'
-import { NovaEnquete } from './features/enquete-professor/NovaEnquete'
-import { ProfessorConduzirEnquete } from './features/enquete-professor/ProfessorConduzirEnquete'
-import { EnqueteEntrar } from './features/enquete-participante/EnqueteEntrar'
-import { EnqueteVotar } from './features/enquete-participante/EnqueteVotar'
-import { ProjecaoEnquete } from './features/enquete-projecao/ProjecaoEnquete'
 import { DEMO_MODE } from './lib/client'
 import { CAPI_INTEGRATED } from './lib/capiIntegration'
 import { AuthProvider } from './features/auth/AuthContext'
@@ -55,16 +49,8 @@ export default function App() {
           <Route path="/aluno/:sessaoId/cards" element={<RequireAuth><CapiCards /></RequireAuth>} />
           <Route path="/cards" element={<RequireAuth><CapiCards /></RequireAuth>} />
 
-          {/* ---------- Enquetes (opinião / quebra-gelo / escala) ----------
-              Motor paralelo ao de sessão avaliativa, mesmo login e mesmo
-              padrão de código/QR — ver src/lib/types.ts. */}
-          <Route path="/professor/enquetes" element={<RequireStaff><MinhasEnquetes /></RequireStaff>} />
-          <Route path="/professor/enquetes/nova" element={<RequireStaff><NovaEnquete /></RequireStaff>} />
-          <Route path="/professor/enquetes/:enqueteId" element={<RequireStaff><ProfessorConduzirEnquete /></RequireStaff>} />
-          {/* Projeção sem guarda, mesmo motivo de /projecao/:sessaoId. */}
-          <Route path="/projecao-enquete/:enqueteId" element={<ProjecaoEnquete />} />
-          <Route path="/enquete/entrar" element={<RequireAuth><EnqueteEntrar /></RequireAuth>} />
-          <Route path="/enquete/:enqueteId" element={<RequireAuth><EnqueteVotar /></RequireAuth>} />
+          {/* Enquetes de sala retiradas do Capi por decisão do professor
+              (09/10/2026). Código e dados preservados; rotas desativadas. */}
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

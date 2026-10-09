@@ -40,11 +40,6 @@ export function Home() {
           <Btn variant="secondary" onClick={() => navigate('/aluno')} className="w-full">
             Sou aluno(a) — entrar com código
           </Btn>
-          {mostrarBotaoProfessor && (
-            <Btn variant="terra" onClick={() => { if (modo === 'demo') entrarComoDemo(PROFESSOR_DEMO); navigate('/professor/enquetes') }} className="w-full">
-              Enquete de sala (opinião / quebra-gelo)
-            </Btn>
-          )}
           {modo === 'supabase' && identidade && (
             <button
               className="text-xs text-textMuted underline mt-1"
