@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>SAM · Painel touch</title>
+<link rel="stylesheet" href="painel.css">
+</head>
+<body>
+<!-- Palco fixo de 1080×1920 (55" 4K em pé, escala 2×). Fora do painel,
+     o palco é reduzido para caber na janela; ?real=1 mostra em tamanho real. -->
+<div id="palco" aria-live="polite"></div>
+<div id="lightbox" hidden>
+  <div class="lb-area"><img id="lb-img" alt=""></div>
+  <div class="lb-legenda" id="lb-legenda"></div>
+  <div class="lb-botoes">
+    <button data-zoom="-1" aria-label="Diminuir">−</button>
+    <button data-zoom="0">Ajustar</button>
+    <button data-zoom="1" aria-label="Ampliar">+</button>
+    <button data-fechar>Fechar ✕</button>
+  </div>
+</div>
+<script src="painel.js"></script>
+</body>
+</html>
