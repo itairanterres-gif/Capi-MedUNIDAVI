@@ -227,7 +227,7 @@
   async function carregarPrograma() {
     if (modo !== "supabase" || !window.PROGRAMA || !window.DIAS) return { ok: true, itens: 0 };
     var r = await sb().from("sam_programa")
-      .select("dia,bloco,ordem,hora,tema,apresentador,titulo,sam_trabalhos(codigo,area,prof_uc)")
+      .select("dia,bloco,ordem,hora,tema,apresentador,titulo,prof_uc,sam_trabalhos(codigo,area,titulo)")
       .eq("edicao_id", cfg.edicao).order("dia").order("ordem");
     if (r.error) return falha(r.error);
     var n = 0;
@@ -236,9 +236,10 @@
       var chave = window.DIAS.find(function (d) { return d.indexOf(partes[2] + "/" + partes[1]) >= 0; });
       if (!chave) return;
       var w = p.sam_trabalhos || {};
-      var base = { ap: p.apresentador || "", titulo: p.titulo || "", area: w.area || p.tema || "" };
+      /* Trabalho publicado manda no título e na área; antes disso vale o cronograma. */
+      var base = { ap: p.apresentador || "", titulo: w.titulo || p.titulo || "", area: w.area || p.tema || "", uc: p.prof_uc || "" };
       if (w.codigo) base.id = w.codigo;
-      if (p.bloco === "oral") window.PROGRAMA[chave].orais.push(Object.assign(base, { tc: p.ordem, hora: p.hora || "", uc: w.prof_uc || "" }));
+      if (p.bloco === "oral") window.PROGRAMA[chave].orais.push(Object.assign(base, { tc: p.ordem, hora: p.hora || "" }));
       else window.PROGRAMA[chave].posteres.push(Object.assign(base, { n: Number(String(p.ordem).replace(/[^0-9]/g, "")) || p.ordem }));
       n++;
     });

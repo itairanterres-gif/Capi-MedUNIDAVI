@@ -113,6 +113,13 @@ const TRABALHOS = [
    Por dia, opcionais: sci (horário da sessão científica), abertura, youtube. */
 const PROGRAMA = {};
 DIAS.forEach((d) => { PROGRAMA[d] = { orais: [], posteres: [] }; });
+/* Horários do dia (cronograma de 30/09/2026): Science with coffee (exposição dos
+   pôsteres) e, na segunda-feira, a abertura. Podem mudar até o evento. */
+PROGRAMA["Seg · 23/11"].sci = "16h45–17h45"; PROGRAMA["Seg · 23/11"].abertura = { hora:"17h45–18h00", label:"Abertura da XII SAM" };
+PROGRAMA["Ter · 24/11"].sci = "17h00–18h00";
+PROGRAMA["Qua · 25/11"].sci = "16h20–17h20";
+PROGRAMA["Qui · 26/11"].sci = "16h20–17h20";
+PROGRAMA["Sex · 27/11"].sci = "16h20–17h20";
 
 /* trabalhoById: resolve nos EXEMPLOS — uso interno/dev. As telas públicas
    resolvem na lista real via useTrabalhos()/trabalhoNaLista (lib.jsx). */
