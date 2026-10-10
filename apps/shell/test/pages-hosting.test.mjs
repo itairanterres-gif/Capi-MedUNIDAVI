@@ -40,10 +40,9 @@ test('HashRouter entry redirects cannot swallow assets or expose ENAMED paths', 
   assert.ok(rules.includes('/questoes /questoes/ 302'));
   assert.ok(rules.includes('/amrigs /amrigs/ 302'));
 });
-test('SAM allows framing only by itself ("Ver na TV" embeds a same-origin iframe); the rest of Capi stays DENY', async () => {
+test('no Capi page may be framed, SAM included (the horizontal TV preview was removed)', async () => {
   const { samPagesHeaders, samCSP } = await import('../pages-hosting.mjs');
-  const sam = samPagesHeaders(canonicalURL);
-  assert.ok(sam.includes('X-Frame-Options: SAMEORIGIN') && sam.includes('! X-Frame-Options'));
-  assert.ok(samCSP(canonicalURL).includes("frame-ancestors 'self'"));
-  assert.ok(pagesHeaders(canonicalURL).includes('X-Frame-Options: DENY') && pagesHeaders(canonicalURL).includes("frame-ancestors 'none'"));
+  assert.ok(!samPagesHeaders(canonicalURL).includes('X-Frame-Options'));
+  assert.ok(samCSP(canonicalURL).includes("frame-ancestors 'none'"));
+  assert.ok(pagesHeaders(canonicalURL).includes('X-Frame-Options: DENY'));
 });

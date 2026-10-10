@@ -134,31 +134,6 @@ function Ficha({ t, email, senha, onVoltar, onAtualizar }) {
   // 8ª fase = resumo de artigo (resumo_completo), não pôster estruturado (ver _ehResumo8 em posters.jsx)
   const ehResumo8 = Number(t.fase) === 8;
 
-  /* ----- AJUSTE DE LAYOUT (DOC 3): edição ao vivo na prévia "Ver na TV".
-     Os controles vivem DENTRO do overlay (arraste das figuras); aqui só
-     abrimos a prévia editável e persistimos o ajuste_layout no backend. */
-  const verNaTV = () => {
-    if (!window.SAM_PREVIA) return;
-    window.SAM_PREVIA.abrir({
-      trabalho: t,
-      editavel: true,
-      salvarLabel: "Salvar ajuste",
-      onSalvar: async (ajuste_layout) => {
-        if (SB) {
-          const res = await window.SAM_BACKEND.curadoriaAjustarLayout(t._uuid, ajuste_layout);
-          if (!res.ok) throw new Error(res.erro || "Não foi possível salvar o ajuste.");
-          onAtualizar && onAtualizar({ ...t, ajuste_layout });
-          return "Ajuste salvo.";
-        }
-        const r = await fetch(API_URL, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify({ tipo:"ajuste_layout", action:"ajuste_layout", id:t.id, ajuste_layout, email_curadora:email, senha_curadora:senha||"" }) });
-        let res; try { res = await r.json(); } catch (e) { throw new Error("Resposta inválida do servidor."); }
-        if (!res.ok) throw new Error(res.erro || "Não foi possível salvar o ajuste.");
-        onAtualizar && onAtualizar({ ...t, ajuste_layout });
-        return "Ajuste salvo.";
-      },
-    });
-  };
-
   const acao = async (status) => {
     if (status === "ajuste" && !comentario.trim()) { setErro("Para devolver, escreva o que precisa ser ajustado."); return; }
     setErro(""); setEnviando(status);
@@ -278,14 +253,8 @@ function Ficha({ t, email, senha, onVoltar, onAtualizar }) {
             </>)}
           </div>
 
-          {/* AJUSTE DE LAYOUT: editado ao vivo na prévia "Ver na TV" (botão abaixo) */}
-
           {/* AÇÕES DE CURADORIA */}
           <div style={{ borderTop:"1px solid #EEF2F6", background:"#FBFDFE", padding:"20px 24px" }}>
-            <button type="button" onClick={verNaTV} style={{ width:"100%", marginBottom:16, background:C.azul, color:"#fff", border:"none", borderRadius:10, padding:"11px", fontSize:14, fontWeight:700, cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-              Ver na TV
-            </button>
             <div style={{ fontSize:13, fontWeight:800, color:C.tinta, marginBottom:4 }}>Decisão editorial</div>
             <div style={{ fontSize:12.5, color:C.cinza, marginBottom:12 }}>Confira a completude. Comentário obrigatório ao devolver para ajuste.</div>
             <textarea rows={3} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário para a equipe (o que falta, o que corrigir)…" style={{ ...campo, resize:"vertical" }} />

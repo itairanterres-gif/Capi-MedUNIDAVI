@@ -514,31 +514,6 @@ const F_INICIAL = {
   resultados:"", conclusao:"", palavras:"", referencias:"", resumo:"",
   anexarSlides:"nao", slidesUrl:"",
 };
-/* Pôster na TV dentro da página (mesmo quadro do "Ver na TV", sem tela cheia).
-   Atualiza sozinho (com atraso curto) enquanto o aluno digita; o ajuste das
-   figuras e das colunas vai direto ao rascunho. */
-function PreviaTVIncorporada({ trabalho, chave, onAjuste }) {
-  const alvo = useRef(null);
-  const atual = useRef(trabalho); atual.current = trabalho;
-  const aoAjustar = useRef(onAjuste); aoAjustar.current = onAjuste;
-  useEffect(() => {
-    if (!window.SAM_PREVIA || !alvo.current) return;
-    window.SAM_PREVIA.incorporar(alvo.current, { trabalho: atual.current, editavel: true, onAjuste: (s) => aoAjustar.current && aoAjustar.current(s) });
-    return () => window.SAM_PREVIA.desmontar();
-  }, []);
-  useEffect(() => {
-    const id = setTimeout(() => window.SAM_PREVIA && window.SAM_PREVIA.atualizar(atual.current), 600);
-    return () => clearTimeout(id);
-  }, [chave]);
-  return (
-    <div style={{ marginTop:8 }}>
-      <div style={{ fontSize:12, fontWeight:700, color:C.azul, textTransform:"uppercase", letterSpacing:0.4, marginBottom:6 }}>Seu pôster na TV</div>
-      <div ref={alvo} />
-      <div style={{ fontSize:12, color:C.cinza, marginTop:6, lineHeight:1.45 }}>É assim que o pôster aparece no telão. Ajuste as figuras e as colunas aqui mesmo; o ajuste vale para o envio.</div>
-    </div>
-  );
-}
-
 function SubmissaoApp() {
   /* Dentro do Capi (modo supabase), o aluno logado abre sempre o próprio
      trabalho: sem link com token e sem e-mail digitado. */
@@ -886,9 +861,6 @@ function SubmissaoApp() {
               <textarea rows={4} style={campo} value={f.referencias} onChange={set("referencias")} placeholder={"Ex.: SOUZA, A. B. et al. Título do artigo. Revista, v. 1, 2024.\nUma referência por linha."}/>
               <div style={{ fontSize:11.5, color:C.cinza, marginTop:5 }}>No pôster, as referências ficam numa seção recolhível no pé — abre e fecha sem ocupar espaço.</div>
             </div>
-            {/* Pôster na TV, incorporado: atualiza enquanto o aluno preenche */}
-            <PreviaTVIncorporada trabalho={previewT} onAjuste={setAjusteLayout}
-              chave={JSON.stringify([f, figuras.map(fg=>[fg.secao, fg.legenda, fg.titulo, (fg.dataUrl||"").length, (fg.dataUrl||"").slice(-24)]), principal, (fotoAutores||"").length, ajusteLayout])} />
           </>}
 
           {/* SLIDES DA APRESENTAÇÃO (opcional) — link manual; entra no material do trabalho */}
