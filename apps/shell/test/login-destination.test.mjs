@@ -29,3 +29,9 @@ test('SAM pages are valid login destinations; hostile variants are not',()=>{
  for(const bad of ['/sam','/sam/../questoes/','/sam/x.html','/sam/supabase/proposta/20261008120000_sam_xii.sql','/sam/dados-origem/contas-sinteticas-local.json','/sam/#//evil.test','/sam/#/../admin','/sam/submissao.html#/editar?id=1&token=2','/sam/index.html?x=1','https://evil.test/sam/'])
   assert.equal(safeDestination(bad),null,bad);
 });
+test('SAM pages are accepted with or without .html (Cloudflare serves them without)',()=>{
+ for(const ok of ['/sam/submissao','/sam/curadoria','/sam/telao#/estacao/1','/sam/edicao','/sam/material','/sam/index#/trabalho/F8-A3B9'])
+  assert.equal(safeDestination(ok),ok,ok);
+ for(const bad of ['/sam/outra','/sam/submissao/x','/sam/submissao.htm','/sam/submissao?x=1','/sam/_validacao','/sam/Painéis LED'])
+  assert.equal(safeDestination(bad),null,bad);
+});
