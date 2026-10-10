@@ -3,7 +3,7 @@ import { createPrivateImageView } from './private-image-ui.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { resolveIdentity } from './auth-contract.mjs';
 import { validateAuthConfig } from './config-contract.mjs';
-import { usableClues } from './clues.mjs';
+import { usableClues, stemDisplay } from './clues.mjs';
 import { buildSession, catalogFilter, errorNotebook, filterPool, latestAttempts, pending, questionYear, validQuestion } from './amrigs-core.mjs';
 
 const el = id => document.getElementById(`amrigs-${id}`);
@@ -85,7 +85,7 @@ function renderNotebook() {
   el('errors').replaceChildren(...errors.map(q => {
     const details = document.createElement('details'), summary = document.createElement('summary'), stem = document.createElement('p');
     summary.textContent = `${q.body.area || 'Área não classificada'} · ${q.body.source || 'AMRIGS'} · ${q.body.topic || 'Tema não classificado'}`;
-    stem.textContent = q.body.stem; details.append(summary, stem, ...imageNodes(q.body.images));
+    stem.className = 'enunciado'; stem.textContent = stemDisplay(q.body.stem); details.append(summary, stem, ...imageNodes(q.body.images));
     for (const a of q.body.alternatives) {
       const p = document.createElement('p');
       p.textContent = `${a.id}. ${q.body.alternativesInImage ? `Alternativa ${a.id} na figura` : a.text}${a.id === q.body.correct ? ' — correta' : ''} ${a.rationale || ''}`;
@@ -101,7 +101,7 @@ function renderQuestion(q) {
   show('activity', true); show('setup', false); show('summary', false);
   set('progress', `Questão ${Object.keys(session.answered).length + (finished ? 0 : 1)} de ${session.questionIds.length}`);
   el('title').classList.remove('com-pistas', 'pistas-ocultas'); el('title').onclick = null;
-  set('title', b.stem); set('source', `${b.area || ''} · ${b.source || 'AMRIGS'}`);
+  set('title', stemDisplay(b.stem)); set('source', `${b.area || ''} · ${b.source || 'AMRIGS'}`);
   imagesReady = false;
   const button = el('form').querySelector('button'); button.disabled = true;
   el('skip').hidden = true; show('figure-note', false);
@@ -180,7 +180,7 @@ function catalogItem(q) {
   details.addEventListener('toggle', () => {
     if (!details.open || details.dataset.montado) return;
     details.dataset.montado = '1';
-    const stem = document.createElement('p'); stem.textContent = b.stem;
+    const stem = document.createElement('p'); stem.className = 'enunciado'; stem.textContent = stemDisplay(b.stem);
     details.append(stem, ...imageNodes(b.images));
     for (const a of b.alternatives) {
       const div = document.createElement('div'), texto = document.createElement('span');
