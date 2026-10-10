@@ -635,16 +635,18 @@ function SubmissaoApp() {
       if (ehFase8 && !f.resumo.trim()) { alert("Cole o resumo submetido à revista no campo Resumo."); return; }
       setEnviando(true);
       try {
+        const comImagem = figuras.filter(fg=>fg.dataUrl);
         const res = await window.SAM_BACKEND.salvarMeuTrabalho(uuidRef.current, {
           titulo:f.titulo, desenho:f.desenho, area:f.area, autores:f.autores, orientador:f.orientador,
           afiliacao:f.afiliacao, introducao:f.intro, objetivos:f.objetivos, metodos:f.metodos,
           resultados:f.resultados, conclusao:f.conclusao, palavras:f.palavras, referencias:f.referencias,
           resumo_completo:f.resumo, slidesUrl: f.anexarSlides==="sim" ? f.slidesUrl.trim() : "",
-          fig_principal: figuras.length ? principal+1 : null,
+          fig_principal: comImagem.length ? Math.max(0, comImagem.indexOf(figuras[principal])) + 1 : null,
         });
-        // Figuras e foto ainda não vão ao Supabase (Storage pendente): avisar, não perder em silêncio.
-        const pendenteImagens = figuras.some(fg=>fg.dataUrl && fg.dataUrl.startsWith("data:")) || (fotoAutores && fotoAutores.startsWith("data:"));
-        setResultado(res.ok ? { ok:true, aviso: pendenteImagens ? "Texto salvo. O envio de figuras e foto ainda não está ativo nesta versão de teste." : "" } : { ok:false, erro:res.erro });
+        if (!res.ok) { setResultado({ ok:false, erro:res.erro }); return; }
+        // Imagens vão ao Storage do Capi depois do texto; se falharem, o texto já está salvo.
+        const img = await window.SAM_BACKEND.salvarImagens(uuidRef.current, comImagem, fotoAutores);
+        setResultado(img.ok ? { ok:true, aviso:"" } : { ok:true, aviso:"Texto salvo, mas as imagens não foram enviadas: " + img.erro + " Tente enviar de novo." });
       } catch (e) { setResultado({ ok:false, erro:String(e) }); } finally { setEnviando(false); }
       return;
     }

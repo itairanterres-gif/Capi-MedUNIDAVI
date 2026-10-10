@@ -48,7 +48,7 @@
     var orient = autores.filter(function (a) { return a.papel === "orientador"; }).map(function (a) { return a.nome; });
     var principal = Number(r.fig_principal) || 1;
     var figuras = (r.sam_figuras || []).slice().sort(function (a, b) { return a.ordem - b.ordem; }).map(function (f) {
-      return { ordem: f.ordem, secao: f.secao, titulo: f.titulo || "", legenda: f.legenda || "", url: urlArquivo(f.storage_path), principal: f.ordem === principal };
+      return { ordem: f.ordem, secao: f.secao, titulo: f.titulo || "", legenda: f.legenda || "", url: urlArquivo(f.storage_path), path: f.storage_path, principal: f.ordem === principal };
     });
     var m = (r.sam_materiais || [])[0] || (r.sam_materiais && !Array.isArray(r.sam_materiais) ? r.sam_materiais : null);
     var material = m && (m.podcast_url || m.quiz || m.flashcards_url || m.flashcards_texto || m.link_artigo || m.publicacao)
@@ -113,6 +113,57 @@
     };
     var r = await sb().rpc("sam_salvar_trabalho", { t: uuid, dados: dados });
     return r.error ? falha(r.error) : { ok: true };
+  }
+
+  /* Figuras e foto dos autores: o navegador envia o arquivo ao Storage (bucket
+     sam-figuras, pasta do próprio trabalho) e a função sam_salvar_figuras registra
+     os caminhos. Arquivo que deixou de ser usado é apagado no fim (sem alarde). */
+  var BUCKET = "sam-figuras";
+  function dataUrlParaBlob(d) {
+    var m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(d);
+    if (!m) throw new Error("Formato de imagem não aceito (use PNG, JPG ou WebP).");
+    var bin = atob(m[2]), u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new Blob([u8], { type: m[1] });
+  }
+  function aleatorio() {
+    var a = new Uint8Array(6); crypto.getRandomValues(a);
+    return Array.prototype.map.call(a, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+  }
+  function caminhoDaUrl(url) {
+    var marca = "/object/public/" + BUCKET + "/", i = String(url || "").indexOf(marca);
+    return i < 0 ? "" : decodeURIComponent(String(url).slice(i + marca.length));
+  }
+  async function resolverImagem(uuid, origem, prefixo) {
+    if (!origem) return "";
+    if (String(origem).indexOf("data:") === 0) {
+      var blob = dataUrlParaBlob(origem);
+      var ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+      var path = uuid + "/" + prefixo + "-" + aleatorio() + "." + ext;
+      var up = await sb().storage.from(BUCKET).upload(path, blob, { contentType: blob.type, upsert: false, cacheControl: "3600" });
+      if (up.error) throw new Error("Não foi possível enviar a imagem: " + up.error.message);
+      return path;
+    }
+    return caminhoDaUrl(origem);       // já estava no Storage
+  }
+  async function salvarImagens(uuid, figuras, foto) {
+    try {
+      var itens = [];
+      for (var i = 0; i < figuras.length; i++) {
+        var fg = figuras[i], p = await resolverImagem(uuid, fg.dataUrl || fg.url, "fig" + (i + 1));
+        if (p) itens.push({ path: p, secao: fg.secao, titulo: fg.titulo || "", legenda: fg.legenda || "" });
+      }
+      var fotoPath = await resolverImagem(uuid, foto, "foto");
+      var r = await sb().rpc("sam_salvar_figuras", { t: uuid, figuras: itens, foto: fotoPath || null });
+      if (r.error) return falha(r.error);
+      try {
+        var usados = {}; itens.forEach(function (x) { usados[x.path] = 1; }); if (fotoPath) usados[fotoPath] = 1;
+        var lst = await sb().storage.from(BUCKET).list(uuid, { limit: 100 });
+        var sobras = (lst.data || []).map(function (o) { return uuid + "/" + o.name; }).filter(function (n) { return !usados[n]; });
+        if (sobras.length) await sb().storage.from(BUCKET).remove(sobras);
+      } catch (e) { /* limpeza é opcional */ }
+      return { ok: true };
+    } catch (e) { return falha(e); }
   }
 
   /* Curadoria. */
@@ -203,7 +254,7 @@
   window.SAM_BACKEND = {
     modo: modo,
     listarPublicados: listarPublicados,
-    meuTrabalho: meuTrabalho, salvarMeuTrabalho: salvarMeuTrabalho,
+    meuTrabalho: meuTrabalho, salvarMeuTrabalho: salvarMeuTrabalho, salvarImagens: salvarImagens,
     curadoriaListar: curadoriaListar, curadoriaDecidir: curadoriaDecidir, ehCurador: ehCurador,
     curadoriaAjustarLayout: curadoriaAjustarLayout,
     apreciar: apreciar, listarApreciacoes: listarApreciacoes,
