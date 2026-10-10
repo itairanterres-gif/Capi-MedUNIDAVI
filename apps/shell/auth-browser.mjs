@@ -20,6 +20,7 @@ let client, config;
 let generation = 0;
 let recovery = false;
 let amrigsOn = false;
+let samOn = false;
 let chosenView = 'login';
 
 class UserError extends Error {}
@@ -30,7 +31,7 @@ function view(name) {
 // Lista de atividades por papel, montada com DOM (sem HTML injetado).
 function renderActivities(identity) {
   activities.replaceChildren();
-  const lista = identity ? activitiesFor(identity.role, { amrigs: amrigsOn }) : [];
+  const lista = identity ? activitiesFor(identity.role, { amrigs: amrigsOn, sam: samOn }) : [];
   for (const item of lista) {
     const a = document.createElement('a'); a.href = item.href; a.className = 'activity';
     const t = document.createElement('strong'); t.textContent = item.label;
@@ -95,11 +96,14 @@ try {
   if (!response.ok) throw new Error();
   config = await response.json();
   amrigsOn = !!config.amrigsPilot;
+  samOn = !!config.sam;
   const local = /^http:\/\/127\.0\.0\.1:\d+$/.test(config.url) && config.storageKey === 'sb-capi-local-auth-token';
   if (!local && (config.url !== canonicalURL || config.storageKey !== storageKey)) throw new Error();
   if (destination === '/amrigs/' && !config.amrigsPilot) destination = '/questoes/';
+  if (destination.startsWith('/sam/') && !config.sam) destination = '/questoes/';
   launch.href = destination;
-  launch.textContent = destination === '/amrigs/' ? 'Abrir Treino AMRIGS →' : 'Abrir Sessão de Questões →';
+  launch.textContent = destination === '/amrigs/' ? 'Abrir Treino AMRIGS →'
+    : destination.startsWith('/sam/') ? 'Continuar na Semana Acadêmica (SAM) →' : 'Abrir Sessão de Questões →';
   $('#google').hidden = !config.googleEnabled;
   $('#google-sep').textContent = config.googleEnabled ? 'ou entre com e-mail e senha' : 'Entre com e-mail e senha.';
   client = createClient(config.url, config.key, { auth: { flowType: 'pkce', storageKey: config.storageKey, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });

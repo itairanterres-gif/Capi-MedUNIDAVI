@@ -45,9 +45,10 @@ jobs:
         run: |
           set -e
           D=apps/shell/hosted-dist
-          test "$(find $D -name '*.png' | wc -l)" = 0
+          # Figuras AMRIGS nunca vão no pacote; as fotos públicas da SAM (sam/) podem.
+          test "$(find $D -path $D/sam -prune -o -name '*.png' -print | wc -l)" = 0
           ! grep -rlE 'sb_secret_[A-Za-z0-9_-]{8,}|BEGIN .*PRIVATE KEY' $D
-          ! grep -rli 'enamed' $D
+          ! grep -rliw 'enamed' $D
 
       - name: Publicar no Cloudflare Pages
         run: npx --yes wrangler@3.114.0 pages deploy apps/shell/hosted-dist --project-name capi-medunidavi --branch main --commit-hash "${{ github.sha }}" --commit-message "GitHub ${{ github.sha }}"

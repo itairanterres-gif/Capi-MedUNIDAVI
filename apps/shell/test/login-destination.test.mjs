@@ -23,3 +23,9 @@ test('Capi launches existing ENAMED/AMRIGS origins without identity or token for
  assert.ok(home.includes('https://treino-enamed.onrender.com/#/amrigs'));
  assert.ok(!home.includes('access_token='));assert.ok(!home.includes('refresh_token='));
 });
+test('SAM pages are valid login destinations; hostile variants are not',()=>{
+ for(const ok of ['/sam/','/sam/submissao.html','/sam/curadoria.html','/sam/index.html#/trabalho/F8-A3B9','/sam/#/estacao/2','/sam/telao.html#/estacao/1'])
+  assert.equal(safeDestination(ok),ok,ok);
+ for(const bad of ['/sam','/sam/../questoes/','/sam/x.html','/sam/supabase/proposta/20261008120000_sam_xii.sql','/sam/dados-origem/contas-sinteticas-local.json','/sam/#//evil.test','/sam/#/../admin','/sam/submissao.html#/editar?id=1&token=2','/sam/index.html?x=1','https://evil.test/sam/'])
+  assert.equal(safeDestination(bad),null,bad);
+});

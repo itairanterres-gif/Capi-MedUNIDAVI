@@ -1,0 +1,731 @@
+/* ============================================================
+   XI SAM 2026 — CURADORIA (gestão editorial, NÃO avaliação)
+   A curadora confere completude e decide:
+     • Liberar (publicar)   → status "publicado"
+     • Devolver para ajuste → status "ajuste" (comentário obrigatório)
+   Mesmo backend (Apps Script) e mesmo design system das demais telas.
+   Contrato com o backend NÃO PODE MUDAR (campos, status, headers).
+   ============================================================ */
+const { useState, useMemo, useEffect } = React;
+
+// Apenas o e-mail pode ser lembrado para conveniência.
+// A senha existe somente em memória durante a sessão da página.
+const LS_CURADORIA_EMAIL = "sam_curadoria_email";
+
+// MESMA URL /exec usada em submissao.html e nas demais telas:
+const API_URL = "https://script.google.com/macros/s/AKfycbw8GrSUw3Ck8Pt4qolDD44xy_4Y0vXv9KaUfEUZKFUk7qKUWyE8kJRpTqSX9AtdNRCrOg/exec";
+// Dentro do Capi (/sam/), a curadoria usa o Supabase e a conta do Capi.
+const SB = !!(window.SAM_BACKEND && window.SAM_BACKEND.modo === "supabase");
+
+const C = {
+  azul:"#023E88", azulEsc:"#01285A", ciano:"#00ADEF", cianoClaro:"#E5F6FE",
+  tinta:"#0C1A2B", cinza:"#5B6B7E", cinzaClaro:"#EEF2F6", papel:"#F7F9FB",
+  erro:"#C0392B", verde:"#1F8A5B", ambar:"#B07A18",
+};
+const AREA_COR = {
+  "Educação Médica":"#5B6B7E","Neurologia":"#6A4C93","Neurocirurgia":"#5B3A82",
+  "Geriatria":"#B07A18","Psiquiatria":"#7A4D9C","Medicina de Família e Comunidade":"#D38F00",
+  "Ginecologia e Obstetrícia":"#B23A82","Oncologia":"#2A8A5C","Otorrinolaringologia":"#0080B7",
+  "Endocrinologia":"#C4622D","Infectologia":"#3D6E1B","Pediatria":"#00ADEF",
+  "Cardiologia":"#A23A1F","Cirurgia Vascular":"#7A2616",
+};
+// status do backend → rótulo + cor (NÃO alterar as chaves)
+const STATUS = {
+  enviado:   { label:"Aguardando", cor:C.ambar },
+  publicado: { label:"Publicado",  cor:C.verde },
+  ajuste:    { label:"Em ajuste",  cor:C.erro },
+};
+
+/* ---------- Ícones (stroke SVG inline) ---------- */
+function SIco({ size = 20, color = "currentColor", sw = 2, children, fill = "none", className, style }) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={color}
+      strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+      style={{ flexShrink:0, display:"block", ...style }}>{children}</svg>
+  );
+}
+const Microscope  = (p) => <SIco {...p}><path d="M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h2M9 12a2 2 0 0 1-2-2V6h4v4a2 2 0 0 1-2 2ZM12 6V3a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v3"/></SIco>;
+const CalendarDays= (p) => <SIco {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></SIco>;
+const ArrowLeft   = (p) => <SIco {...p}><path d="M19 12H5M12 19l-7-7 7-7"/></SIco>;
+const Search      = (p) => <SIco {...p}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></SIco>;
+const CheckCircle2= (p) => <SIco {...p}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></SIco>;
+const Undo2       = (p) => <SIco {...p}><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></SIco>;
+const Star        = (p) => <SIco {...p}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></SIco>;
+const ImageIcon   = (p) => <SIco {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></SIco>;
+const LogOut      = (p) => <SIco {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></SIco>;
+const Loader2     = (p) => <SIco {...p}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></SIco>;
+const AlertTriangle=(p) => <SIco {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></SIco>;
+const X           = (p) => <SIco {...p}><path d="M18 6 6 18M6 6l12 12"/></SIco>;
+const Lock        = (p) => <SIco {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></SIco>;
+const MessageSquare=(p) => <SIco {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></SIco>;
+const ClipboardList=(p) => <SIco {...p}><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></SIco>;
+const GraduationCap=(p)=> <SIco {...p}><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1 2 2.5 6 2.5s6-1.5 6-2.5v-5"/></SIco>;
+const UserRound   = (p) => <SIco {...p}><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></SIco>;
+const Users       = (p) => <SIco {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></SIco>;
+const Mail        = (p) => <SIco {...p}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></SIco>;
+const ChevronDown = (p) => <SIco {...p}><path d="m6 9 6 6 6-6"/></SIco>;
+const RotateCw    = (p) => <SIco {...p}><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></SIco>;
+const Download    = (p) => <SIco {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></SIco>;
+
+/* ---------- estilos base ---------- */
+const campo = { width:"100%", padding:"10px 12px", border:"1px solid #D6DFE9", borderRadius:10, fontSize:14, color:C.tinta, fontFamily:"inherit", background:"#fff", boxSizing:"border-box" };
+const Selo = ({ s }) => {
+  const st = STATUS[s] || { label:s, cor:C.cinza };
+  return <span style={{ fontSize:11.5, fontWeight:800, color:"#fff", background:st.cor, borderRadius:999, padding:"3px 11px", whiteSpace:"nowrap", letterSpacing:0.2 }}>{st.label}</span>;
+};
+
+/* ============================ LOGIN ============================ */
+function Login({ onOk, emailInicial = "", senhaInicial = "", erroInicial = "" }) {
+  const [email, setEmail] = useState(emailInicial);
+  const [senha, setSenha] = useState(senhaInicial);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState(erroInicial);
+
+  const entrar = async () => {
+    const e = email.trim();
+    if (!e) { setErro("Informe seu e-mail institucional."); return; }
+    setErro(""); setCarregando(true);
+    try {
+      const r = await fetch(API_URL + "?action=curadoria&email=" + encodeURIComponent(e) + "&senha=" + encodeURIComponent(senha));
+      const res = await r.json();
+      if (res.ok) onOk(e, senha, res.trabalhos || []);
+      else setErro(res.erro || "E-mail não autorizado para a curadoria.");
+    } catch (err) {
+      setErro("Falha de conexão com o servidor. Tente novamente.");
+    } finally { setCarregando(false); }
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20, background:`radial-gradient(1200px 600px at 50% -10%, ${C.cianoClaro}, ${C.papel})` }}>
+      <div style={{ width:"100%", maxWidth:400, background:"#fff", border:"1px solid #E3EAF2", borderRadius:18, padding:30, boxShadow:"0 18px 50px rgba(2,40,90,0.10)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:18 }}>
+          <div style={{ width:42, height:42, borderRadius:11, background:C.azul, display:"flex", alignItems:"center", justifyContent:"center" }}><Microscope size={22} color="#fff" /></div>
+          <div style={{ lineHeight:1.1 }}>
+            <div style={{ fontWeight:800, fontSize:18, color:C.azul }}>SAM <span style={{ color:C.ciano }}>2026</span></div>
+            <div style={{ fontSize:11.5, color:C.cinza, marginTop:2 }}>Curadoria editorial</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:7, fontSize:12.5, color:C.cinza, background:C.cianoClaro, borderRadius:9, padding:"9px 11px", marginBottom:18 }}>
+          <Lock size={15} color={C.azul} /> Acesso restrito à curadora autorizada.
+        </div>
+        <label style={{ fontSize:12, fontWeight:700, color:C.azul, marginBottom:6, display:"block", textTransform:"uppercase", letterSpacing:0.4 }}>E-mail institucional</label>
+        <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} onKeyDown={(e)=>{ if(e.key==="Enter") entrar(); }} placeholder="curadoria@unidavi.edu.br" style={campo} />
+        <label style={{ fontSize:12, fontWeight:700, color:C.azul, margin:"14px 0 6px", display:"block", textTransform:"uppercase", letterSpacing:0.4 }}>Senha da curadoria</label>
+        <input type="password" value={senha} onChange={(e)=>setSenha(e.target.value)} onKeyDown={(e)=>{ if(e.key==="Enter") entrar(); }} placeholder="••••••••" autoComplete="current-password" style={campo} />
+        {erro && <div style={{ display:"flex", alignItems:"center", gap:7, color:C.erro, fontSize:12.5, marginTop:10 }}><AlertTriangle size={15} color={C.erro} /> {erro}</div>}
+        <button onClick={entrar} disabled={carregando} style={{ width:"100%", marginTop:16, background:carregando?C.cinza:C.azul, color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:14.5, fontWeight:700, cursor:carregando?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+          {carregando ? <><Loader2 size={17} className="girando" /> Verificando…</> : "Entrar"}
+        </button>
+        <div style={{ textAlign:"center", marginTop:16 }}>
+          <a href="index.html" style={{ fontSize:12, color:C.cinza, textDecoration:"none" }}>← voltar à exibição</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ FICHA ============================ */
+function Ficha({ t, email, senha, onVoltar, onAtualizar }) {
+  const [comentario, setComentario] = useState(t.comentario_curadoria || "");
+  const [enviando, setEnviando] = useState(null); // "publicado" | "ajuste" | null
+  const [erro, setErro] = useState("");
+  const cor = AREA_COR[t.area] || C.ciano;
+  const fase7 = Number(t.fase) === 7;
+  // 8ª fase = resumo de artigo (resumo_completo), não pôster estruturado (ver _ehResumo8 em posters.jsx)
+  const ehResumo8 = Number(t.fase) === 8;
+
+  /* ----- AJUSTE DE LAYOUT (DOC 3): edição ao vivo na prévia "Ver na TV".
+     Os controles vivem DENTRO do overlay (arraste das figuras); aqui só
+     abrimos a prévia editável e persistimos o ajuste_layout no backend. */
+  const verNaTV = () => {
+    if (!window.SAM_PREVIA) return;
+    window.SAM_PREVIA.abrir({
+      trabalho: t,
+      editavel: true,
+      salvarLabel: "Salvar ajuste",
+      onSalvar: async (ajuste_layout) => {
+        if (SB) {
+          const res = await window.SAM_BACKEND.curadoriaAjustarLayout(t._uuid, ajuste_layout);
+          if (!res.ok) throw new Error(res.erro || "Não foi possível salvar o ajuste.");
+          onAtualizar && onAtualizar({ ...t, ajuste_layout });
+          return "Ajuste salvo.";
+        }
+        const r = await fetch(API_URL, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify({ tipo:"ajuste_layout", action:"ajuste_layout", id:t.id, ajuste_layout, email_curadora:email, senha_curadora:senha||"" }) });
+        let res; try { res = await r.json(); } catch (e) { throw new Error("Resposta inválida do servidor."); }
+        if (!res.ok) throw new Error(res.erro || "Não foi possível salvar o ajuste.");
+        onAtualizar && onAtualizar({ ...t, ajuste_layout });
+        return "Ajuste salvo.";
+      },
+    });
+  };
+
+  const acao = async (status) => {
+    if (status === "ajuste" && !comentario.trim()) { setErro("Para devolver, escreva o que precisa ser ajustado."); return; }
+    setErro(""); setEnviando(status);
+    if (SB) {
+      const res = await window.SAM_BACKEND.curadoriaDecidir(t._uuid, status, comentario.trim());
+      if (res.ok) onAtualizar({ ...t, status, comentario_curadoria:comentario.trim() });
+      else setErro(res.erro || "Não foi possível registrar a decisão.");
+      setEnviando(null);
+      return;
+    }
+    try {
+      const r = await fetch(API_URL, {
+        method:"POST",
+        headers:{ "Content-Type":"text/plain;charset=utf-8" }, // OBRIGATÓRIO (evita preflight CORS)
+        body: JSON.stringify({ tipo:"curadoria", email_curadora:email, senha_curadora:senha || "", id:t.id, status, comentario:comentario.trim() }),
+      });
+      const res = await r.json();
+      if (res.ok) onAtualizar({ ...t, status, comentario_curadoria:comentario.trim() });
+      else setErro(res.erro || "Não foi possível registrar a decisão.");
+    } catch (err) {
+      setErro("Falha de conexão com o servidor.");
+    } finally { setEnviando(null); }
+  };
+
+  const Badge = ({ children, bg }) => <span style={{ fontSize:12, fontWeight:700, padding:"5px 13px", borderRadius:999, background:bg||C.cinzaClaro, color:bg?"#fff":C.cinza, whiteSpace:"nowrap" }}>{children}</span>;
+  // figuras atribuídas a cada seção (secao do formulário): para tratar "campo vazio mas com figura"
+  const figsPorSec = useMemo(() => {
+    const m = {};
+    (Array.isArray(t.figuras) ? t.figuras : []).forEach((f) => { if (f && f.secao) m[f.secao] = (m[f.secao] || 0) + 1; });
+    return m;
+  }, [t.figuras]);
+  const Campo = ({ titulo, texto, temFigura }) => (
+    <div style={{ marginBottom:20 }}>
+      <div style={{ fontSize:12, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, marginBottom:6 }}>{titulo}</div>
+      {texto && String(texto).trim()
+        ? <div style={{ fontSize:14.5, lineHeight:1.5, color:C.tinta }}>{texto}</div>
+        : temFigura
+          ? <div style={{ fontSize:13, fontStyle:"italic", color:C.cinza }}>(seção apresentada em figura)</div>
+          : <div style={{ fontSize:13, fontStyle:"italic", color:C.erro, display:"flex", alignItems:"center", gap:6 }}><AlertTriangle size={14} color={C.erro} /> Campo não preenchido</div>}
+    </div>
+  );
+  const palavras = (t.palavras ? String(t.palavras).split(",").map(s=>s.trim()).filter(Boolean) : []);
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.papel }}>
+      {/* barra fina fixa */}
+      <div style={{ position:"sticky", top:0, zIndex:20, background:C.azul, color:"#fff", boxShadow:"0 2px 10px rgba(2,40,90,0.22)" }}>
+        <div style={{ maxWidth:760, margin:"0 auto", padding:"0 8px", height:54, display:"flex", alignItems:"center", gap:8 }}>
+          <button onClick={onVoltar} aria-label="Voltar" style={{ flexShrink:0, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", border:"none", background:"transparent", color:"#fff", cursor:"pointer", borderRadius:9 }}><ArrowLeft size={22} color="#fff" /></button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:14.5, fontWeight:700, lineHeight:1.2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.titulo || "(sem título)"}</div>
+            <div style={{ fontSize:11.5, marginTop:1, color:"rgba(255,255,255,0.82)" }}>{t.id} · {t.area}</div>
+          </div>
+          <Selo s={t.status} />
+        </div>
+      </div>
+
+      <div style={{ maxWidth:760, margin:"18px auto 40px", padding:"0 16px" }}>
+        <div style={{ background:"#fff", border:"1px solid #E3EAF2", borderRadius:16, overflow:"hidden" }}>
+          {/* cabeçalho da ficha */}
+          <div style={{ padding:"22px 24px", borderBottom:"1px solid #EEF2F6" }}>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+              <Badge bg={C.azul}>{t.fase}ª fase</Badge>
+              <Badge>{t.desenho || t.tipo}</Badge>
+              <Badge bg={cor}>{t.area}</Badge>
+              <Badge>{t.id}</Badge>
+            </div>
+            <div style={{ fontSize:23, fontWeight:800, lineHeight:1.18, letterSpacing:-0.3, color:C.tinta, marginBottom:10 }}>{t.titulo || <span style={{ color:C.erro, fontStyle:"italic" }}>Sem título</span>}</div>
+            <div style={{ fontSize:14, color:C.cinza, lineHeight:1.4 }}>
+              {t.autores ? t.autores : <span style={{ color:C.erro, fontStyle:"italic" }}>Autores não preenchidos</span>}
+            </div>
+          </div>
+
+          {/* corpo */}
+          <div style={{ padding:"22px 24px" }}>
+            {ehResumo8 ? (
+              /* 8ª fase: uma única seção "Resumo"; sem campos de pôster nem Figuras/Palavras-chave */
+              <Campo titulo="Resumo" texto={t.resumo_completo} />
+            ) : (<>
+            <Campo titulo="Introdução" texto={t.introducao} temFigura={!!figsPorSec["Introdução"]} />
+            <Campo titulo="Objetivos" texto={t.objetivos} />
+            <Campo titulo="Métodos" texto={t.metodos} temFigura={!!figsPorSec["Métodos"]} />
+            <Campo titulo={fase7 ? "Resultados esperados" : "Resultados"} texto={t.resultados} temFigura={!!figsPorSec["Resultados"]} />
+            {!fase7 && <Campo titulo="Conclusão" texto={t.conclusao} temFigura={!!figsPorSec["Discussão"]} />}
+
+            {/* figuras na ordem */}
+            <div style={{ fontSize:12, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>Figuras</div>
+            {Array.isArray(t.figuras) && t.figuras.length > 0 ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:20 }}>
+                {t.figuras.map((fg, i) => (
+                  <div key={i} style={{ border:`1px solid ${fg.principal?C.ciano:"#E3EAF2"}`, borderRadius:12, overflow:"hidden", background:C.papel }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 12px", borderBottom:"1px solid #EEF2F6", background:fg.principal?C.cianoClaro:"#fff" }}>
+                      <span style={{ fontSize:12, fontWeight:800, color:C.azul }}>Fig {fg.ordem || i+1}</span>
+                      <span style={{ fontSize:11.5, color:C.cinza }}>{fg.secao}</span>
+                      {fg.principal && <span style={{ marginLeft:"auto", display:"inline-flex", alignItems:"center", gap:4, fontSize:11, fontWeight:700, color:C.ciano }}><Star size={12} fill={C.ciano} color={C.ciano} /> Principal</span>}
+                    </div>
+                    <div style={{ display:"flex", gap:12, padding:12, alignItems:"flex-start" }}>
+                      <div style={{ width:120, height:90, flexShrink:0, borderRadius:8, overflow:"hidden", background:"#EEF2F6", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        {fg.url ? <img src={fg.url} alt="" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }} /> : <ImageIcon size={26} color={C.cinza} />}
+                      </div>
+                      <div style={{ fontSize:13.5, color:C.tinta, lineHeight:1.4 }}>{fg.legenda || <span style={{ color:C.erro, fontStyle:"italic" }}>Legenda não preenchida</span>}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize:13, fontStyle:"italic", color:C.erro, marginBottom:20, display:"flex", alignItems:"center", gap:6 }}><AlertTriangle size={14} color={C.erro} /> Nenhuma figura enviada</div>
+            )}
+
+            {/* palavras-chave */}
+            <div style={{ fontSize:12, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>Palavras-chave</div>
+            {palavras.length > 0 ? (
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {palavras.map((p) => <span key={p} style={{ fontSize:12.5, background:C.cinzaClaro, color:C.cinza, borderRadius:999, padding:"5px 13px" }}>{p}</span>)}
+              </div>
+            ) : <div style={{ fontSize:13, fontStyle:"italic", color:C.erro, display:"flex", alignItems:"center", gap:6 }}><AlertTriangle size={14} color={C.erro} /> Não preenchidas</div>}
+            </>)}
+          </div>
+
+          {/* AJUSTE DE LAYOUT: editado ao vivo na prévia "Ver na TV" (botão abaixo) */}
+
+          {/* AÇÕES DE CURADORIA */}
+          <div style={{ borderTop:"1px solid #EEF2F6", background:"#FBFDFE", padding:"20px 24px" }}>
+            <button type="button" onClick={verNaTV} style={{ width:"100%", marginBottom:16, background:C.azul, color:"#fff", border:"none", borderRadius:10, padding:"11px", fontSize:14, fontWeight:700, cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              Ver na TV
+            </button>
+            <div style={{ fontSize:13, fontWeight:800, color:C.tinta, marginBottom:4 }}>Decisão editorial</div>
+            <div style={{ fontSize:12.5, color:C.cinza, marginBottom:12 }}>Confira a completude. Comentário obrigatório ao devolver para ajuste.</div>
+            <textarea rows={3} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário para a equipe (o que falta, o que corrigir)…" style={{ ...campo, resize:"vertical" }} />
+            {erro && <div style={{ display:"flex", alignItems:"center", gap:7, color:C.erro, fontSize:12.5, marginTop:10 }}><AlertTriangle size={15} color={C.erro} /> {erro}</div>}
+            <div style={{ display:"flex", gap:10, marginTop:14, flexWrap:"wrap" }}>
+              <button onClick={()=>acao("publicado")} disabled={!!enviando} style={{ flex:"1 1 200px", display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8, background:C.verde, color:"#fff", border:"none", borderRadius:10, padding:"12px 16px", fontSize:14, fontWeight:700, cursor:enviando?"default":"pointer", opacity:enviando?0.7:1 }}>
+                {enviando==="publicado" ? <Loader2 size={17} className="girando" /> : <CheckCircle2 size={17} color="#fff" />} Liberar (publicar)
+              </button>
+              <button onClick={()=>acao("ajuste")} disabled={!!enviando || !comentario.trim()} title={!comentario.trim() ? "Escreva um comentário para devolver" : ""} style={{ flex:"1 1 200px", display:"inline-flex", alignItems:"center", justifyContent:"center", gap:8, background:"#fff", color:(!comentario.trim()||enviando)?"#C5A0A0":C.erro, border:`1px solid ${(!comentario.trim()||enviando)?"#E3C9C9":C.erro}`, borderRadius:10, padding:"12px 16px", fontSize:14, fontWeight:700, cursor:(enviando||!comentario.trim())?"default":"pointer" }}>
+                {enviando==="ajuste" ? <Loader2 size={17} className="girando" /> : <Undo2 size={17} />} Devolver para ajuste
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ PAINEL ============================ */
+function Painel({ email, senha, trabalhos, onSair, onAbrir, onAtualizar }) {
+  const [filtro, setFiltro] = useState("todos");
+  const [busca, setBusca] = useState("");
+  const [aba, setAba] = useState("trabalhos");
+
+  const cont = useMemo(() => {
+    const c = { enviado:0, publicado:0, ajuste:0 };
+    trabalhos.forEach((t) => { if (c[t.status] != null) c[t.status]++; });
+    return c;
+  }, [trabalhos]);
+
+  const lista = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return trabalhos.filter((t) => {
+      if (filtro !== "todos" && t.status !== filtro) return false;
+      if (!q) return true;
+      return (t.titulo || "").toLowerCase().includes(q) || (t.autores || "").toLowerCase().includes(q);
+    });
+  }, [trabalhos, filtro, busca]);
+
+  const stat = (label, valor, cor) => (
+    <div style={{ background:"#fff", border:"1px solid #E3EAF2", borderRadius:14, padding:"16px 18px", flex:"1 1 130px" }}>
+      <div style={{ fontSize:30, fontWeight:800, color:cor, lineHeight:1 }}>{valor}</div>
+      <div style={{ fontSize:12.5, color:C.cinza, marginTop:6, fontWeight:600 }}>{label}</div>
+    </div>
+  );
+  const chip = (val, label, cor) => (
+    <button onClick={()=>setFiltro(val)} style={{ border:"none", borderRadius:999, padding:"7px 14px", fontSize:13, fontWeight:700, cursor:"pointer", background:filtro===val?(cor||C.azul):"#fff", color:filtro===val?"#fff":C.cinza, boxShadow:filtro===val?"none":"inset 0 0 0 1px #E3EAF2", whiteSpace:"nowrap" }}>{label}</button>
+  );
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.papel }}>
+      <header style={{ background:"#fff", borderBottom:"1px solid #E3EAF2", position:"sticky", top:0, zIndex:10 }}>
+        <div style={{ background:C.azulEsc }}>
+          <div style={{ maxWidth:1100, margin:"0 auto", padding:"9px 16px" }}>
+            <div style={{ height:40, backgroundImage:`url(${(window.__resources && window.__resources.logoStrip) || "assets/logo-strip.jpeg"})`, backgroundSize:"contain", backgroundRepeat:"no-repeat", backgroundPosition:"left center" }} role="img" aria-label="Medicina UNIDAVI · NPCMed · SAM 2026" />
+          </div>
+        </div>
+        <div style={{ maxWidth:1100, margin:"0 auto", padding:"0 16px", display:"flex", alignItems:"center", gap:10, height:54 }}>
+          <div style={{ fontWeight:800, fontSize:15.5, color:C.azul }}>Curadoria <span style={{ color:C.cinza, fontWeight:600 }}>· gestão editorial</span></div>
+          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
+            <span style={{ fontSize:12.5, color:C.cinza, maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} className="cur-email">{email}</span>
+            <button onClick={onSair} style={{ display:"inline-flex", alignItems:"center", gap:7, border:"1px solid #E3EAF2", background:"#fff", color:C.cinza, fontSize:13, fontWeight:700, padding:"8px 13px", borderRadius:10, cursor:"pointer" }}><LogOut size={15} color={C.cinza} /><span className="lbl-sair">Sair</span></button>
+          </div>
+        </div>
+      </header>
+
+      <div style={{ maxWidth:1100, margin:"0 auto", padding:"20px 16px 60px" }}>
+        {/* abas */}
+        <div style={{ display:"flex", gap:8, marginBottom:20, borderBottom:"1px solid #E3EAF2" }}>
+          {[["trabalhos", ClipboardList, "Trabalhos"], ["apreciacoes", MessageSquare, "Apreciações"]].map(([val, Ico, label]) => {
+            const on = aba === val;
+            return (
+              <button key={val} onClick={() => setAba(val)}
+                style={{ display:"inline-flex", alignItems:"center", gap:8, border:"none", background:"transparent", cursor:"pointer", fontFamily:"inherit", fontSize:14.5, fontWeight:700, color:on ? C.azul : C.cinza, padding:"10px 6px", marginBottom:-1, borderBottom:`3px solid ${on ? C.azul : "transparent"}` }}>
+                <Ico size={17} color={on ? C.azul : C.cinza} /> {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {aba === "apreciacoes" && <ApreciacoesPanel email={email} senha={senha} />}
+
+        {aba === "trabalhos" && (<>
+        <div style={{ display:"flex", alignItems:"center", gap:7, fontSize:12.5, color:C.cinza, background:C.cianoClaro, borderRadius:10, padding:"9px 13px", marginBottom:18 }}>
+          <Lock size={15} color={C.azul} /> Curadoria é <strong style={{ color:C.azulEsc }}>gestão editorial</strong> — conferência de completude. O mérito já foi avaliado pela banca de TC.
+        </div>
+
+        {/* contadores */}
+        <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:20 }}>
+          {stat("Aguardando", cont.enviado, C.ambar)}
+          {stat("Publicados", cont.publicado, C.verde)}
+          {stat("Em ajuste", cont.ajuste, C.erro)}
+          {stat("Total", trabalhos.length, C.azul)}
+        </div>
+
+        {/* filtros + busca */}
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center", marginBottom:18 }}>
+          <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+            {chip("todos","Todos",C.azul)}
+            {chip("enviado","Aguardando",C.ambar)}
+            {chip("publicado","Publicados",C.verde)}
+            {chip("ajuste","Em ajuste",C.erro)}
+          </div>
+          <div style={{ marginLeft:"auto", position:"relative", flex:"1 1 240px", maxWidth:340 }}>
+            <Search size={16} color={C.cinza} style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} />
+            <input value={busca} onChange={(e)=>setBusca(e.target.value)} placeholder="Buscar por título ou autor…" style={{ ...campo, paddingLeft:36 }} />
+          </div>
+        </div>
+
+        {/* lista */}
+        {lista.length === 0 ? (
+          <div style={{ textAlign:"center", color:C.cinza, padding:"50px 20px", fontSize:14 }}>Nenhum trabalho neste filtro.</div>
+        ) : (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(330px, 1fr))", gap:12 }}>
+            {lista.map((t) => {
+              const cor = AREA_COR[t.area] || C.cinza;
+              return (
+                <button key={t.id} onClick={()=>onAbrir(t.id)} style={{ textAlign:"left", background:"#fff", border:"1px solid #E3EAF2", borderLeft:`4px solid ${cor}`, borderRadius:12, padding:16, cursor:"pointer", display:"flex", flexDirection:"column", gap:8 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{ fontSize:11.5, fontWeight:800, color:C.azul }}>{t.id}</span>
+                    <span style={{ fontSize:11.5, color:C.cinza }}>· {t.fase}ª fase</span>
+                    <span style={{ marginLeft:"auto" }}><Selo s={t.status} /></span>
+                  </div>
+                  <div style={{ fontSize:14.5, fontWeight:700, color:C.tinta, lineHeight:1.3 }}>{t.titulo || <span style={{ color:C.erro, fontStyle:"italic" }}>Sem título</span>}</div>
+                  <div style={{ fontSize:12.5, color:C.cinza, lineHeight:1.35 }}>{t.autores || <span style={{ color:C.erro, fontStyle:"italic" }}>Autores não preenchidos</span>}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ APRECIAÇÕES ============================ */
+/* Lê as apreciações enviadas pelo público/banca (GET action=apreciacoes,
+   reusa e-mail + senha da curadoria). Agrupa por trabalho. */
+const AP_TIPO = {
+  docente: { label:"Docente / Banca", Ico:GraduationCap, cor:C.azul },
+  aluno:   { label:"Aluno de medicina", Ico:UserRound, cor:C.ciano },
+  outro:   { label:"Outro", Ico:Users, cor:C.cinza },
+};
+function _apRespObj(a) {
+  let r = a && a.respostas;
+  if (typeof r === "string") { try { r = JSON.parse(r); } catch (e) { r = null; } }
+  return r || {};
+}
+function _apChip(resposta, valor) {
+  // 5 = verde, 1 = vermelho (intensidade da resposta). null → cinza.
+  const ramp = ["#C0392B", "#C16A2E", "#7E8794", "#3E9468", "#1F8A5B"];
+  const cor = valor ? (ramp[valor - 1] || C.cinza) : C.cinza;
+  return (
+    <span style={{ fontSize:11.5, fontWeight:700, color:"#fff", background:cor, borderRadius:999, padding:"3px 10px", whiteSpace:"nowrap" }}>
+      {resposta || "—"}
+    </span>
+  );
+}
+function ApreciacaoCard({ a }) {
+  const meta = AP_TIPO[a.tipo_apreciador] || AP_TIPO.outro;
+  const r = _apRespObj(a);
+  const itens = Array.isArray(r.itens) ? r.itens : [];
+  const Ico = meta.Ico;
+  return (
+    <div style={{ background:"#fff", border:"1px solid #E3EAF2", borderRadius:12, padding:"14px 16px", borderLeft:`4px solid ${meta.cor}` }}>
+      <div style={{ display:"flex", alignItems:"center", gap:9, flexWrap:"wrap", marginBottom:10 }}>
+        <span style={{ display:"inline-flex", alignItems:"center", gap:6, fontSize:12.5, fontWeight:800, color:meta.cor }}>
+          <Ico size={15} color={meta.cor} /> {meta.label}
+        </span>
+        {a.tipo_tc && <span style={{ fontSize:11, fontWeight:700, color:C.cinza, background:C.cinzaClaro, borderRadius:999, padding:"2px 9px" }}>{a.tipo_tc}</span>}
+        {a.email_apreciador ? (
+          <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:12, color:C.cinza, marginLeft:"auto" }}>
+            <Mail size={13} color={C.cinza} /> {a.email_apreciador}
+          </span>
+        ) : a.nome_apreciador ? (
+          <span style={{ fontSize:12, color:C.cinza, marginLeft:"auto" }}>{a.nome_apreciador}</span>
+        ) : <span style={{ fontSize:11.5, color:"#9AA8B8", marginLeft:"auto", fontStyle:"italic" }}>anônimo</span>}
+      </div>
+
+      {/* avaliação global + recomendação em destaque */}
+      {(r.global || r.recomenda) && (
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:itens.length ? 12 : 4 }}>
+          {r.global && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:C.papel, borderRadius:9, padding:"6px 10px" }}>
+              <span style={{ fontSize:11.5, color:C.cinza, fontWeight:600 }}>Global</span> {_apChip(r.global.resposta, r.global.valor)}
+            </div>
+          )}
+          {r.recomenda && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:C.papel, borderRadius:9, padding:"6px 10px" }}>
+              <span style={{ fontSize:11.5, color:C.cinza, fontWeight:600 }}>Premiação</span>
+              <span style={{ fontSize:11.5, fontWeight:700, color:C.tinta }}>{r.recomenda.resposta || "—"}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* respostas detalhadas */}
+      {itens.length > 0 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+          {(() => {
+            let grupoAtual = null;
+            return itens.map((it, i) => {
+              const mostraGrupo = it.grupo && it.grupo !== grupoAtual;
+              grupoAtual = it.grupo || grupoAtual;
+              return (
+                <div key={i}>
+                  {mostraGrupo && <div style={{ fontSize:10.5, fontWeight:800, color:C.ciano, textTransform:"uppercase", letterSpacing:0.8, margin:"8px 0 4px" }}>{it.grupo}</div>}
+                  <div style={{ display:"flex", alignItems:"center", gap:10, padding:"5px 0", borderTop: i && !mostraGrupo ? "1px solid #F2F5F8" : "none" }}>
+                    <span style={{ flex:1, fontSize:12.5, color:C.tinta, lineHeight:1.35 }}>{it.texto}</span>
+                    {_apChip(it.resposta, it.valor)}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
+
+      {/* comentários abertos */}
+      {a.comentario_aberto && String(a.comentario_aberto).trim() && (
+        <div style={{ marginTop:12, background:C.cianoClaro, borderRadius:10, padding:"10px 13px", fontSize:13, color:C.tinta, lineHeight:1.5, whiteSpace:"pre-wrap" }}>{a.comentario_aberto}</div>
+      )}
+    </div>
+  );
+}
+function GrupoApreciacoes({ g }) {
+  const [aberto, setAberto] = useState(false);
+  const globais = g.lista.map((a) => { const r = _apRespObj(a); return r.global && r.global.valor; }).filter((v) => v != null);
+  const media = globais.length ? (globais.reduce((s, v) => s + v, 0) / globais.length) : null;
+  return (
+    <div style={{ background:"#fff", border:"1px solid #E3EAF2", borderRadius:14, overflow:"hidden" }}>
+      <button onClick={() => setAberto((x) => !x)} style={{ width:"100%", textAlign:"left", background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", padding:"15px 16px", display:"flex", alignItems:"center", gap:12 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+            <span style={{ fontSize:11.5, fontWeight:800, color:C.azul }}>{g.id}</span>
+            {g.fase ? <span style={{ fontSize:11.5, color:C.cinza }}>· {g.fase}ª fase</span> : null}
+          </div>
+          <div style={{ fontSize:14.5, fontWeight:700, color:C.tinta, lineHeight:1.3 }}>{g.titulo}</div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:19, fontWeight:800, color:C.azul, lineHeight:1 }}>{g.lista.length}</div>
+            <div style={{ fontSize:10.5, color:C.cinza, fontWeight:600 }}>{g.lista.length === 1 ? "apreciação" : "apreciações"}</div>
+          </div>
+          {media != null && (
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:19, fontWeight:800, color:C.verde, lineHeight:1 }}>{media.toFixed(1)}</div>
+              <div style={{ fontSize:10.5, color:C.cinza, fontWeight:600 }}>global /5</div>
+            </div>
+          )}
+          <ChevronDown size={20} color={C.cinza} style={{ transform:aberto ? "rotate(180deg)" : "none", transition:"transform .15s" }} />
+        </div>
+      </button>
+      {aberto && (
+        <div style={{ borderTop:"1px solid #EEF2F6", background:C.papel, padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
+          {g.lista.map((a, i) => <ApreciacaoCard key={i} a={a} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+/* monta e baixa um CSV (uma linha por resposta de cada apreciação) — achata
+   o respostas_json em colunas legíveis. Abre direto no Excel/Sheets. */
+function _csvCell(v) {
+  const s = v == null ? "" : String(v);
+  return /[";,\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function baixarApreciacoesCSV(dados) {
+  const cab = ["criado_em", "trabalho_id", "trabalho_titulo", "fase", "tipo_apreciador",
+    "email_apreciador", "nome_apreciador", "tipo_tc", "grupo", "pergunta", "resposta", "valor", "comentario_aberto"];
+  const linhas = [cab];
+  (dados || []).forEach((a) => {
+    const r = _apRespObj(a);
+    const base = [a.criado_em || "", a.trabalho_id || "", a.trabalho_titulo || "", a.fase || "",
+      a.tipo_apreciador || "", a.email_apreciador || "", a.nome_apreciador || "", a.tipo_tc || ""];
+    const extras = [];
+    (Array.isArray(r.itens) ? r.itens : []).forEach((it) => extras.push({ grupo:it.grupo, p:it.texto, resp:it.resposta, val:it.valor }));
+    if (r.global) extras.push({ grupo:"Avaliação", p:"Avaliação global", resp:r.global.resposta, val:r.global.valor });
+    if (r.recomenda) extras.push({ grupo:"Avaliação", p:"Recomendaria para premiação/destaque", resp:r.recomenda.resposta, val:r.recomenda.valor });
+    if (extras.length === 0) extras.push({ grupo:"", p:"", resp:"", val:"" });
+    extras.forEach((ex, i) => {
+      linhas.push([...base, ex.grupo || "", ex.p || "", ex.resp || "", ex.val == null ? "" : ex.val,
+        i === 0 ? (a.comentario_aberto || "") : ""].map(_csvCell));
+    });
+  });
+  const csv = "\uFEFF" + linhas.map((l) => l.join(";")).join("\r\n"); // BOM + ; p/ Excel pt-BR
+  const blob = new Blob([csv], { type:"text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const hoje = new Date().toISOString().slice(0, 10);
+  a.href = url; a.download = "apreciacoes-sam-" + hoje + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function ApreciacoesPanel({ email, senha }) {
+  const [status, setStatus] = useState("carregando"); // carregando | ok | erro
+  const [dados, setDados] = useState([]);
+
+  const buscar = () => {
+    setStatus("carregando");
+    if (SB) {
+      window.SAM_BACKEND.listarApreciacoes()
+        .then((res) => { if (!res.ok) throw new Error(res.erro); setDados(res.apreciacoes); setStatus("ok"); })
+        .catch(() => setStatus("erro"));
+      return;
+    }
+    fetch(API_URL + "?action=apreciacoes&email=" + encodeURIComponent(email) + "&senha=" + encodeURIComponent(senha || ""))
+      .then((r) => r.json())
+      .then((res) => {
+        if (!res || res.ok === false) throw new Error(res && res.erro);
+        const arr = res.apreciacoes || res.lista || res.dados || [];
+        setDados(Array.isArray(arr) ? arr : []);
+        setStatus("ok");
+      })
+      .catch(() => setStatus("erro"));
+  };
+  useEffect(buscar, []);
+
+  const grupos = useMemo(() => {
+    const m = new Map();
+    (dados || []).forEach((a) => {
+      const id = a.trabalho_id || a.trabalhoId || "—";
+      if (!m.has(id)) m.set(id, { id, titulo:a.trabalho_titulo || a.titulo || id, fase:a.fase, lista:[] });
+      m.get(id).lista.push(a);
+    });
+    return [...m.values()].sort((x, y) => y.lista.length - x.lista.length);
+  }, [dados]);
+
+  if (status === "carregando") return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, color:C.cinza, fontSize:14, padding:"60px 20px" }}>
+      <Loader2 size={18} className="girando" /> Carregando apreciações…
+    </div>
+  );
+  if (status === "erro") return (
+    <div style={{ textAlign:"center", color:C.cinza, padding:"50px 20px", fontSize:14 }}>
+      <AlertTriangle size={26} color={C.ambar} style={{ margin:"0 auto 12px" }} />
+      <div style={{ marginBottom:14 }}>Não foi possível carregar as apreciações agora.</div>
+      <button onClick={buscar} style={{ display:"inline-flex", alignItems:"center", gap:7, border:"1px solid #E3EAF2", background:"#fff", color:C.azul, borderRadius:10, padding:"9px 16px", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}><RotateCw size={14} color={C.azul} /> Tentar de novo</button>
+    </div>
+  );
+  if (grupos.length === 0) return (
+    <div style={{ textAlign:"center", color:C.cinza, padding:"60px 20px" }}>
+      <MessageSquare size={30} color="#C5D2E0" style={{ margin:"0 auto 14px" }} />
+      <div style={{ fontSize:14.5, lineHeight:1.5, maxWidth:320, margin:"0 auto" }}>Ainda não há apreciações enviadas. Elas aparecem aqui assim que o público e a banca avaliarem os trabalhos.</div>
+    </div>
+  );
+  const total = dados.length;
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", gap:7, fontSize:12.5, color:C.cinza, background:C.cianoClaro, borderRadius:10, padding:"9px 13px", marginBottom:18 }}>
+        <MessageSquare size={15} color={C.azul} /> <strong style={{ color:C.azulEsc }}>{total}</strong> {total === 1 ? "apreciação recebida" : "apreciações recebidas"} em <strong style={{ color:C.azulEsc }}>{grupos.length}</strong> {grupos.length === 1 ? "trabalho" : "trabalhos"}.
+        <button onClick={buscar} title="Atualizar" style={{ marginLeft:"auto", display:"inline-flex", alignItems:"center", gap:6, border:"1px solid #D6E3EF", background:"#fff", color:C.azul, borderRadius:9, padding:"5px 11px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}><RotateCw size={13} color={C.azul} /> Atualizar</button>
+        <button onClick={() => baixarApreciacoesCSV(dados)} title="Baixar todas as apreciações em CSV" style={{ display:"inline-flex", alignItems:"center", gap:6, border:"none", background:C.azul, color:"#fff", borderRadius:9, padding:"6px 12px", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}><Download size={13} color="#fff" /> Baixar CSV</button>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {grupos.map((g) => <GrupoApreciacoes key={g.id} g={g} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ APP ============================ */
+/* Tela de espera enquanto revalida a sessão guardada (não pisca o login) */
+function Revalidando() {
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20, background:`radial-gradient(1200px 600px at 50% -10%, ${C.cianoClaro}, ${C.papel})` }}>
+      <div style={{ width:"100%", maxWidth:400, background:"#fff", border:"1px solid #E3EAF2", borderRadius:18, padding:30, boxShadow:"0 18px 50px rgba(2,40,90,0.10)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:18 }}>
+          <div style={{ width:42, height:42, borderRadius:11, background:C.azul, display:"flex", alignItems:"center", justifyContent:"center" }}><Microscope size={22} color="#fff" /></div>
+          <div style={{ lineHeight:1.1 }}>
+            <div style={{ fontWeight:800, fontSize:18, color:C.azul }}>SAM <span style={{ color:C.ciano }}>2026</span></div>
+            <div style={{ fontSize:11.5, color:C.cinza, marginTop:2 }}>Curadoria editorial</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:9, fontSize:13.5, color:C.cinza }}>
+          <Loader2 size={18} className="girando" /> Reconectando à sua sessão…
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CuradoriaApp() {
+  const [sessao, setSessao] = useState(null);        // { email, senha, trabalhos }; senha somente em memória
+  const [abertoId, setAbertoId] = useState(null);
+  const [emailInicial, setEmailInicial] = useState(() => {
+    try { return (localStorage.getItem(LS_CURADORIA_EMAIL) || "").trim(); }
+    catch (e) { return ""; }
+  });
+  const [erroInicial, setErroInicial] = useState("");
+  const [sbEstado, setSbEstado] = useState(SB ? "carregando" : null); // carregando | sem_acesso | ok
+
+  /* Dentro do Capi: a curadoria entra com a própria conta do Capi; o papel de
+     curadora é conferido no banco (sem senha compartilhada). */
+  useEffect(() => {
+    if (!SB) return;
+    (async () => {
+      const lista = await window.SAM_BACKEND.curadoriaListar();
+      if (lista.erro === "login") { window.location.assign(lista.entrar); return; }
+      if (!lista.ok || !(await window.SAM_BACKEND.ehCurador())) { setSbEstado("sem_acesso"); return; }
+      setSessao({ email: "", senha: "", trabalhos: lista.trabalhos });
+      setSbEstado("ok");
+    })();
+  }, []);
+  if (SB && sbEstado !== "ok") {
+    return <div style={{ maxWidth:420, margin:"80px auto", padding:24, fontFamily:"'IBM Plex Sans', system-ui, sans-serif", color:C.tinta, textAlign:"center" }}>
+      {sbEstado === "carregando" ? "Conferindo seu acesso à curadoria…" : <>
+        <div style={{ fontWeight:800, fontSize:17, marginBottom:8 }}>Sua conta não tem acesso à curadoria</div>
+        <div style={{ fontSize:13.5, color:C.cinza, marginBottom:16 }}>A curadoria do SAM é liberada pela coordenação para contas específicas do Capi.</div>
+        <a href="/sam/" style={{ color:C.azul, fontWeight:700 }}>← voltar à Semana Acadêmica</a>
+      </>}
+    </div>;
+  }
+
+  if (!sessao) return <Login emailInicial={emailInicial} senhaInicial="" erroInicial={erroInicial} onOk={(email, senha, trabalhos) => {
+    try { localStorage.setItem(LS_CURADORIA_EMAIL, email); } catch (e) {}
+    setEmailInicial(email); setErroInicial("");
+    setSessao({ email, senha, trabalhos });
+  }} />;
+
+  const atualizar = (t) => {
+    setSessao((s) => ({ ...s, trabalhos: s.trabalhos.map((x) => x.id === t.id ? t : x) }));
+  };
+  const aberto = abertoId != null ? sessao.trabalhos.find((t) => t.id === abertoId) : null;
+
+  const sair = () => {
+    if (SB) { window.SAM_BACKEND.sair().finally(() => window.location.assign("/sam/")); return; }
+    try { localStorage.removeItem(LS_CURADORIA_EMAIL); } catch (e) {}
+    setSessao(null); setAbertoId(null);
+    setEmailInicial(""); setErroInicial("");
+  };
+
+  if (aberto) return <Ficha t={aberto} email={sessao.email} senha={sessao.senha} onVoltar={()=>setAbertoId(null)} onAtualizar={(t)=>{ atualizar(t); setAbertoId(null); }} />;
+
+  return <Painel email={sessao.email} senha={sessao.senha} trabalhos={sessao.trabalhos} onSair={sair} onAbrir={setAbertoId} onAtualizar={atualizar} />;
+}
+
+if (typeof window !== "undefined") { window.SAM_CURADORIA = { CuradoriaApp, Ficha, Painel, Login }; }
+if (typeof document !== "undefined" && document.getElementById("root")) {
+  ReactDOM.createRoot(document.getElementById("root")).render(<CuradoriaApp />);
+}
