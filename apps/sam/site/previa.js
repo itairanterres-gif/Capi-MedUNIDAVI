@@ -47,43 +47,8 @@
   function atualizarColunas(c) { ultimo.colunas = c; if (refs.col2 && refs.col3) { estiloSeg(refs.col2, c === 2); estiloSeg(refs.col3, c === 3); } }
   function atualizarReset() { if (refs.reset) { var on = !!ultimo.ajuste_layout; refs.reset.style.opacity = on ? "1" : "0.45"; refs.reset.style.pointerEvents = on ? "auto" : "none"; } }
 
-  function abrir(opts) {
-    opts = opts || {};
-    var trabalho = opts.trabalho || opts; // tolera abrir(trabalho) legado
-    var editavel = opts.editavel !== false;
-    window.__SAM_PREVIA_T = trabalho;
-    try { localStorage.setItem("sam_previa_tv", JSON.stringify(trabalho)); } catch (e) {}
-    var ajIni = ler(trabalho.ajuste_layout);
-    ultimo = { ajuste_layout: trabalho.ajuste_layout || "", colunas: ajIni && ajIni.colunas === 3 ? 3 : 2 };
-
-    // já aberto → recarrega conteúdo
-    if (overlay) { postIframe({ tipo: "sam-previa", trabalho: trabalho }); postIframe({ tipo: "sam-editavel", editavel: editavel }); atualizarColunas(ultimo.colunas); atualizarReset(); return; }
-
-    overlay = document.createElement("div");
-    overlay.setAttribute("data-sam-previa", "1");
-    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#0A1422;display:flex;flex-direction:column;font-family:'IBM Plex Sans',system-ui,sans-serif;";
-
-    /* ---- barra superior ---- */
-    var top = document.createElement("div");
-    top.style.cssText = "flex:0 0 auto;height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#01285A;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.3);";
-    top.innerHTML = '<span style="font-size:11px;font-weight:800;letter-spacing:0.8px;color:#00ADEF;text-transform:uppercase;">Prévia na TV</span>'
-      + '<span style="font-size:13px;opacity:0.82;">Pôster como aparece no telão (1920×1080, sem rolagem)</span>';
-    var bx = document.createElement("button");
-    bx.type = "button"; bx.setAttribute("aria-label", "Fechar prévia");
-    bx.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;font-family:inherit;font-size:13px;font-weight:700;border-radius:9px;padding:7px 13px;cursor:pointer;";
-    bx.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg> Fechar';
-    bx.onclick = fechar; top.appendChild(bx);
-
-    /* ---- painel do pôster (iframe) ---- */
-    var pane = document.createElement("div");
-    pane.style.cssText = "flex:1 1 auto;min-height:0;position:relative;";
-    var ifr = document.createElement("iframe");
-    ifr.src = "previa-tv.html?ts=" + Date.now();
-    ifr.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#0A1422;";
-    ifr.addEventListener("load", function () { postIframe({ tipo: "sam-previa", trabalho: trabalho }); postIframe({ tipo: "sam-editavel", editavel: editavel }); });
-    pane.appendChild(ifr);
-
-    /* ---- barra inferior (controles globais) ---- */
+  /* Barra de controles globais (colunas, dica, reset, salvar). */
+  function criarBarra(opts, editavel) {
     var bot = document.createElement("div");
     bot.style.cssText = "flex:0 0 auto;min-height:60px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 16px;background:#0E2038;color:#fff;border-top:1px solid rgba(255,255,255,0.08);";
 
@@ -139,6 +104,46 @@
       bot.appendChild(so);
     }
 
+    return bot;
+  }
+
+  function abrir(opts) {
+    opts = opts || {};
+    var trabalho = opts.trabalho || opts; // tolera abrir(trabalho) legado
+    var editavel = opts.editavel !== false;
+    window.__SAM_PREVIA_T = trabalho;
+    try { localStorage.setItem("sam_previa_tv", JSON.stringify(trabalho)); } catch (e) {}
+    var ajIni = ler(trabalho.ajuste_layout);
+    ultimo = { ajuste_layout: trabalho.ajuste_layout || "", colunas: ajIni && ajIni.colunas === 3 ? 3 : 2 };
+
+    // já aberto → recarrega conteúdo
+    if (overlay) { postIframe({ tipo: "sam-previa", trabalho: trabalho }); postIframe({ tipo: "sam-editavel", editavel: editavel }); atualizarColunas(ultimo.colunas); atualizarReset(); return; }
+
+    overlay = document.createElement("div");
+    overlay.setAttribute("data-sam-previa", "1");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#0A1422;display:flex;flex-direction:column;font-family:'IBM Plex Sans',system-ui,sans-serif;";
+
+    /* ---- barra superior ---- */
+    var top = document.createElement("div");
+    top.style.cssText = "flex:0 0 auto;height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#01285A;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.3);";
+    top.innerHTML = '<span style="font-size:11px;font-weight:800;letter-spacing:0.8px;color:#00ADEF;text-transform:uppercase;">Prévia na TV</span>'
+      + '<span style="font-size:13px;opacity:0.82;">Pôster como aparece no telão (1920×1080, sem rolagem)</span>';
+    var bx = document.createElement("button");
+    bx.type = "button"; bx.setAttribute("aria-label", "Fechar prévia");
+    bx.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;font-family:inherit;font-size:13px;font-weight:700;border-radius:9px;padding:7px 13px;cursor:pointer;";
+    bx.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg> Fechar';
+    bx.onclick = fechar; top.appendChild(bx);
+
+    /* ---- painel do pôster (iframe) ---- */
+    var pane = document.createElement("div");
+    pane.style.cssText = "flex:1 1 auto;min-height:0;position:relative;";
+    var ifr = document.createElement("iframe");
+    ifr.src = "previa-tv.html?ts=" + Date.now();
+    ifr.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#0A1422;";
+    ifr.addEventListener("load", function () { postIframe({ tipo: "sam-previa", trabalho: trabalho }); postIframe({ tipo: "sam-editavel", editavel: editavel }); });
+    pane.appendChild(ifr);
+
+    var bot = criarBarra(opts, editavel);
     overlay.appendChild(top); overlay.appendChild(pane); overlay.appendChild(bot);
     document.body.appendChild(overlay);
     atualizarReset();
@@ -153,5 +158,56 @@
     window.addEventListener("keydown", onKey);
   }
 
-  window.SAM_PREVIA = { abrir: abrir, fechar: fechar };
+
+  /* Versão dentro da página: o mesmo quadro (iframe) e a mesma barra, sem tela
+     cheia. opts.onAjuste(str) recebe o ajuste a cada mudança (o aluno não
+     precisa clicar em salvar). */
+  var emb = null;
+  function incorporar(container, opts) {
+    opts = opts || {};
+    var trabalho = opts.trabalho, editavel = opts.editavel !== false;
+    window.__SAM_PREVIA_T = trabalho;
+    var ajIni = ler(trabalho.ajuste_layout);
+    ultimo = { ajuste_layout: trabalho.ajuste_layout || "", colunas: ajIni && ajIni.colunas === 3 ? 3 : 2 };
+    desmontar();
+    refs = {}; overlay = container;
+    container.textContent = "";
+    container.style.cssText = "background:#0A1422;border-radius:12px;overflow:hidden;font-family:'IBM Plex Sans',system-ui,sans-serif;";
+    var pane = document.createElement("div");
+    pane.style.cssText = "position:relative;width:100%;aspect-ratio:16/9;";
+    var ifr = document.createElement("iframe");
+    ifr.src = "previa-tv.html?ts=" + Date.now();
+    ifr.title = "Prévia do pôster na TV";
+    ifr.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#0A1422;";
+    ifr.addEventListener("load", function () { postIframe({ tipo: "sam-previa", trabalho: window.__SAM_PREVIA_T }); postIframe({ tipo: "sam-editavel", editavel: editavel }); });
+    pane.appendChild(ifr);
+    container.appendChild(pane);
+    container.appendChild(criarBarra({ onSalvar: null }, editavel));
+    atualizarReset();
+    onMsg = function (e) {
+      if (e.source !== ifr.contentWindow) return;
+      var d = e.data || {};
+      if (d.tipo === "sam-ajuste-pronto") {
+        ultimo.ajuste_layout = d.ajuste_layout || "";
+        if (typeof d.colunas === "number") atualizarColunas(d.colunas);
+        atualizarReset();
+        if (typeof opts.onAjuste === "function") opts.onAjuste(ultimo.ajuste_layout);
+      }
+    };
+    window.addEventListener("message", onMsg);
+    emb = container;
+  }
+  function atualizar(trabalho) {
+    if (!emb) return;
+    window.__SAM_PREVIA_T = trabalho;
+    postIframe({ tipo: "sam-previa", trabalho: trabalho });
+  }
+  function desmontar() {
+    if (!emb) return;
+    if (onMsg) { window.removeEventListener("message", onMsg); onMsg = null; }
+    emb.textContent = ""; emb = null; overlay = null; refs = {};
+    try { delete window.__SAM_PREVIA_T; } catch (e) { window.__SAM_PREVIA_T = null; }
+  }
+
+  window.SAM_PREVIA = { abrir: abrir, fechar: fechar, incorporar: incorporar, atualizar: atualizar, desmontar: desmontar };
 })();
