@@ -89,6 +89,30 @@ const miniBtn = (disabled) => ({ width:28, height:26, borderRadius:6, border:"1p
 
 /* ---------- helpers ---------- */
 function fileToDataUrl(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});}
+/* Reduz a imagem no navegador: PNG fica PNG (gráficos, tabelas), o resto vira JPEG.
+   Lado maior até maxLado e no máximo ~2,4 MB (limite do armazenamento: 2,5 MB). */
+function encolherImagem(file, maxLado){
+  return new Promise((ok, erro)=>{
+    if(!/^image\/(png|jpeg|webp)$/.test(file.type||"")){ erro(new Error("Use uma imagem PNG, JPG ou WebP.")); return; }
+    const url=URL.createObjectURL(file), im=new Image();
+    im.onerror=()=>{ URL.revokeObjectURL(url); erro(new Error("Não consegui abrir esta imagem.")); };
+    im.onload=()=>{
+      URL.revokeObjectURL(url);
+      const png=file.type==="image/png", tipo=png?"image/png":"image/jpeg", LIMITE=2400000;
+      let k=Math.min(1, maxLado/Math.max(im.naturalWidth, im.naturalHeight)), q=0.9;
+      for(let t=0;t<14;t++){
+        const cv=document.createElement("canvas"); cv.width=Math.max(1,Math.round(im.naturalWidth*k)); cv.height=Math.max(1,Math.round(im.naturalHeight*k));
+        const cx=cv.getContext("2d"); if(!png){ cx.fillStyle="#fff"; cx.fillRect(0,0,cv.width,cv.height); }
+        cx.drawImage(im,0,0,cv.width,cv.height);
+        const d=cv.toDataURL(tipo,q), bytes=Math.round((d.length-d.indexOf(",")-1)*3/4);
+        if(bytes<=LIMITE){ ok(d); return; }
+        if(png||q<=0.5) k*=0.8; else q-=0.1;
+      }
+      erro(new Error("A imagem continua grande demais depois de reduzida. Use uma menor."));
+    };
+    im.src=url;
+  });
+}
 function QRMock({ size=96 }) {
   const n=21;
   const cells=useMemo(()=>{const g=Array.from({length:n},()=>Array(n).fill(false));let s=7;const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};
@@ -651,8 +675,24 @@ function SubmissaoApp() {
   }, [f, figuras, principal, fotoAutores, ajusteLayout]);
 
   const addFigura = () => { if (figuras.length < MAX_FIGS) setFiguras([...figuras, { dataUrl:"", secao:"Resultados", legenda:"", titulo:"" }]); };
-  const onFile = async (i, file) => { if (!file) return; if (file.size > 2.5*1024*1024){ alert("Imagem acima de 2,5 MB. Reduza antes de enviar."); return; } const dataUrl = await fileToDataUrl(file); const arr=[...figuras]; arr[i]={...arr[i],dataUrl}; setFiguras(arr); };
-  const onFotoAutores = async (file) => { if (!file) return; if (file.size > 2.5*1024*1024){ alert("Imagem acima de 2,5 MB. Reduza antes de enviar."); return; } const dataUrl = await fileToDataUrl(file); setFotoAutores(dataUrl); };
+  /* Imagem escolhida: reduz no navegador (até 2000 px / ~2,4 MB; foto do autor até 1200 px)
+     e, no SAM do Capi, já envia ao armazenamento — a página guarda só a URL pública,
+     então nada se perde se for recarregada antes de "Enviar trabalho". */
+  const guardarImagem = async (dataUrl, prefixo) =>
+    (SB && uuidRef.current && window.SAM_BACKEND.enviarImagem) ? window.SAM_BACKEND.enviarImagem(uuidRef.current, dataUrl, prefixo) : dataUrl;
+  const onFile = async (i, file) => {
+    if (!file) return;
+    try {
+      const d = await encolherImagem(file, 2000);
+      const url = await guardarImagem(d, "fig" + (i + 1));
+      setFiguras((atual) => { const arr = [...atual]; if (arr[i]) arr[i] = { ...arr[i], dataUrl: url }; return arr; });
+    } catch (e) { alert((e && e.message) || "Não foi possível usar esta imagem."); }
+  };
+  const onFotoAutores = async (file) => {
+    if (!file) return;
+    try { setFotoAutores(await guardarImagem(await encolherImagem(file, 1200), "foto")); }
+    catch (e) { alert((e && e.message) || "Não foi possível usar esta imagem."); }
+  };
   const setFig = (i,k,v) => { const arr=[...figuras]; arr[i]={...arr[i],[k]:v}; setFiguras(arr); };
   const mover = (i,dir) => { const j=i+dir; if(j<0||j>=figuras.length) return; const arr=[...figuras]; [arr[i],arr[j]]=[arr[j],arr[i]]; setFiguras(arr); if(principal===i) setPrincipal(j); else if(principal===j) setPrincipal(i); };
   const remover = (i) => { const arr=figuras.filter((_,k)=>k!==i); setFiguras(arr); if(principal===i) setPrincipal(0); else if(principal>i) setPrincipal(principal-1); };
@@ -675,7 +715,7 @@ function SubmissaoApp() {
         if (!res.ok) { setResultado({ ok:false, erro:res.erro }); return; }
         // Imagens vão ao Storage do Capi depois do texto; se falharem, o texto já está salvo.
         const img = await window.SAM_BACKEND.salvarImagens(uuidRef.current, comImagem, fotoAutores);
-        setResultado(img.ok ? { ok:true, aviso:"" } : { ok:true, aviso:"Texto salvo, mas as imagens não foram enviadas: " + img.erro + " Tente enviar de novo." });
+        setResultado(img.ok ? { ok:true, aviso:"" } : { ok:true, aviso:"Texto salvo. Algumas imagens não foram enviadas (" + img.erro + "). Escolha-as de novo e envie outra vez." });
       } catch (e) { setResultado({ ok:false, erro:String(e) }); } finally { setEnviando(false); }
       return;
     }

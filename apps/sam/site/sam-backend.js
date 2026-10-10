@@ -146,14 +146,25 @@
     }
     return caminhoDaUrl(origem);       // já estava no Storage
   }
+  /* Envia uma imagem já (ao escolhê-la) e devolve a URL pública: assim ela não
+     se perde se a página for recarregada antes do envio do trabalho. */
+  async function enviarImagem(uuid, dataUrl, prefixo) {
+    return urlArquivo(await resolverImagem(uuid, dataUrl, prefixo));
+  }
+  /* Registra as imagens do trabalho. Tenta todas: o que subiu é registrado e o
+     que falhou volta na mensagem (nunca para na primeira falha). */
   async function salvarImagens(uuid, figuras, foto) {
     try {
-      var itens = [];
+      var itens = [], falhas = [];
       for (var i = 0; i < figuras.length; i++) {
-        var fg = figuras[i], p = await resolverImagem(uuid, fg.dataUrl || fg.url, "fig" + (i + 1));
-        if (p) itens.push({ path: p, secao: fg.secao, titulo: fg.titulo || "", legenda: fg.legenda || "" });
+        var fg = figuras[i];
+        try {
+          var p = await resolverImagem(uuid, fg.dataUrl || fg.url, "fig" + (i + 1));
+          if (p) itens.push({ path: p, secao: fg.secao, titulo: fg.titulo || "", legenda: fg.legenda || "" });
+        } catch (e) { falhas.push("figura " + (i + 1) + ": " + ((e && e.message) || e)); }
       }
-      var fotoPath = await resolverImagem(uuid, foto, "foto");
+      var fotoPath = "";
+      try { fotoPath = await resolverImagem(uuid, foto, "foto"); } catch (e) { falhas.push("foto: " + ((e && e.message) || e)); }
       var r = await sb().rpc("sam_salvar_figuras", { t: uuid, figuras: itens, foto: fotoPath || null });
       if (r.error) return falha(r.error);
       try {
@@ -162,7 +173,7 @@
         var sobras = (lst.data || []).map(function (o) { return uuid + "/" + o.name; }).filter(function (n) { return !usados[n]; });
         if (sobras.length) await sb().storage.from(BUCKET).remove(sobras);
       } catch (e) { /* limpeza é opcional */ }
-      return { ok: true };
+      return falhas.length ? { ok: false, erro: falhas.join(" · "), registradas: itens.length } : { ok: true };
     } catch (e) { return falha(e); }
   }
 
@@ -255,7 +266,7 @@
   window.SAM_BACKEND = {
     modo: modo,
     listarPublicados: listarPublicados,
-    meuTrabalho: meuTrabalho, salvarMeuTrabalho: salvarMeuTrabalho, salvarImagens: salvarImagens,
+    meuTrabalho: meuTrabalho, salvarMeuTrabalho: salvarMeuTrabalho, salvarImagens: salvarImagens, enviarImagem: enviarImagem,
     curadoriaListar: curadoriaListar, curadoriaDecidir: curadoriaDecidir, ehCurador: ehCurador,
     curadoriaAjustarLayout: curadoriaAjustarLayout,
     apreciar: apreciar, listarApreciacoes: listarApreciacoes,
