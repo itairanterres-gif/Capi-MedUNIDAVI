@@ -91,14 +91,39 @@ const miniBtn = (disabled) => ({ width:28, height:26, borderRadius:6, border:"1p
 function fileToDataUrl(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});}
 /* Reduz a imagem no navegador: PNG fica PNG (gráficos, tabelas), o resto vira JPEG.
    Lado maior até maxLado e no máximo ~2,4 MB (limite do armazenamento: 2,5 MB). */
+/* SVG vira PNG aqui mesmo (o armazenamento só aceita PNG/JPG/WebP: um SVG pode
+   carregar código). Só o desenho é mantido: script, objetos embutidos e eventos saem. */
+function svgParaBlob(file){
+  return file.text().then((txt)=>{
+    const doc=new DOMParser().parseFromString(txt,"image/svg+xml"), el=doc.documentElement;
+    if(!el||el.nodeName.toLowerCase()!=="svg"||doc.querySelector("parsererror")) throw new Error("Não consegui ler este SVG.");
+    el.querySelectorAll("script,foreignObject").forEach((n)=>n.remove());
+    el.querySelectorAll("*").forEach((n)=>[...n.attributes].forEach((a)=>{ if(/^on/i.test(a.name)) n.removeAttribute(a.name); }));
+    const num=(v)=>{ const n=parseFloat(v); return isFinite(n)&&n>0&&!/%/.test(v||"") ? n : 0; };
+    const vb=(el.getAttribute("viewBox")||"").trim().split(/[\s,]+/).map(Number);
+    const temVb=vb.length===4&&vb[2]>0&&vb[3]>0;
+    let w=num(el.getAttribute("width")), h=num(el.getAttribute("height"));
+    const razao=temVb ? vb[2]/vb[3] : (w&&h ? w/h : 4/3);
+    if(!temVb) el.setAttribute("viewBox","0 0 "+(w||1200)+" "+(h||Math.round((w||1200)/razao)));
+    const W=razao>=1?1600:Math.round(1600*razao), H=razao>=1?Math.round(1600/razao):1600;
+    el.setAttribute("width",String(W)); el.setAttribute("height",String(H));
+    if(!el.getAttribute("xmlns")) el.setAttribute("xmlns","http://www.w3.org/2000/svg");
+    return new Blob([new XMLSerializer().serializeToString(el)],{type:"image/svg+xml"});
+  });
+}
 function encolherImagem(file, maxLado){
+  const ehSvg=file.type==="image/svg+xml"||/\.svg$/i.test(file.name||"");
+  if(!ehSvg) return encolherRaster(file, maxLado, false);
+  return svgParaBlob(file).then((b)=>encolherRaster(b, maxLado, true));
+}
+function encolherRaster(file, maxLado, ehSvg){
   return new Promise((ok, erro)=>{
-    if(!/^image\/(png|jpeg|webp)$/.test(file.type||"")){ erro(new Error("Use uma imagem PNG, JPG ou WebP.")); return; }
+    if(!ehSvg && !/^image\/(png|jpeg|webp)$/.test(file.type||"")){ erro(new Error("Use uma imagem PNG, JPG, WebP ou SVG.")); return; }
     const url=URL.createObjectURL(file), im=new Image();
     im.onerror=()=>{ URL.revokeObjectURL(url); erro(new Error("Não consegui abrir esta imagem.")); };
     im.onload=()=>{
       URL.revokeObjectURL(url);
-      const png=file.type==="image/png", tipo=png?"image/png":"image/jpeg", LIMITE=2400000;
+      const png=ehSvg||file.type==="image/png", tipo=png?"image/png":"image/jpeg", LIMITE=2400000;
       let k=Math.min(1, maxLado/Math.max(im.naturalWidth, im.naturalHeight)), q=0.9;
       for(let t=0;t<14;t++){
         const cv=document.createElement("canvas"); cv.width=Math.max(1,Math.round(im.naturalWidth*k)); cv.height=Math.max(1,Math.round(im.naturalHeight*k));
@@ -477,7 +502,7 @@ function ComoSubmeter({ onIr }) {
         <div style={head}><span style={ico}><ClipboardList size={18} color={C.ciano}/></span><span style={h}>Antes de começar, tenha em mãos</span></div>
         <ul style={ul}>
           <Bullet>Um e-mail válido — usado para a confirmação e o link de edição.</Bullet>
-          <Bullet><strong>7ª fase:</strong> as figuras que deseja incluir (PNG ou JPG, até ~2,5 MB cada) e as referências do projeto.</Bullet>
+          <Bullet><strong>7ª fase:</strong> as figuras que deseja incluir (PNG, JPG ou SVG; o sistema reduz o tamanho sozinho) e as referências do projeto.</Bullet>
           <Bullet><strong>8ª fase:</strong> o texto do resumo exatamente como foi submetido à revista.</Bullet>
         </ul>
       </div>
