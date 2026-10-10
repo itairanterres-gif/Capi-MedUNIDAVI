@@ -888,11 +888,6 @@ function SubmissaoApp() {
             )}
           </div>
 
-          {/* Revisão para o painel: só aponta; nunca altera o texto nem impede o envio */}
-          {window.SAM_REVISAO && <window.SAM_REVISAO.Avisos
-            titulo="Revisão para o painel"
-            vazio="Nenhum aviso. Confira a prévia ao lado: é assim que o trabalho aparece."
-            dados={window.SAM_REVISAO.dadosDoTrabalho(f, figuras.map(fg=>({ src:fg.dataUrl, titulo:fg.titulo, legenda:fg.legenda })))}/>}
           <button onClick={enviar} disabled={enviando} style={{ width:"100%", background:enviando?C.cinza:C.azul, color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:14.5, fontWeight:700, cursor:enviando?"default":"pointer", marginTop:6, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>{enviando ? <><Loader2 size={17} className="girando"/> Enviando…</> : (edicao ? "Reenviar trabalho" : "Enviar trabalho")}</button>
           {!edicao && <div style={{ fontSize:11.5, color:C.cinza, textAlign:"center", marginTop:9 }}>Rascunho salvo automaticamente neste navegador enquanto você digita.</div>}
         </div>

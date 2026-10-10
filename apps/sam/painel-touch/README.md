@@ -20,16 +20,10 @@ para caber. O que não cabe rola ou abre com um toque.
 
 ## Revisão: antes, na submissão e na curadoria
 
-A revisão acontece antes do painel. `../site/revisao.js` mostra avisos:
-
-- na **submissão**, acima do botão de enviar, enquanto o aluno preenche;
-- na **ficha da curadoria**, acima da decisão editorial.
-
-Os avisos são campos não preenchidos, parágrafo colado em dobro (25+ palavras
-repetidas), extensão fora de 250–400 palavras, objetivo longo demais para a
-vitrine, figura pequena para o 55" ou sem título ou legenda. Eles nunca alteram
-o texto nem impedem o envio: o aluno corrige se quiser e a curadora decide
-entre liberar e devolver.
+A revisão acontece antes do painel, na submissão e na curadoria. O código
+dela está em `para-a-frente-principal/` e ainda não está ligado ao app: será
+levado à branch principal do SAM. Ver `para-a-frente-principal/LEIA.md`, que
+também registra as decisões em aberto sobre os painéis.
 
 O painel exibe só trabalhos com `statusCuradoria` igual a `publicado`.
 

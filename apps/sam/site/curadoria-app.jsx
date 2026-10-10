@@ -286,10 +286,6 @@ function Ficha({ t, email, senha, onVoltar, onAtualizar }) {
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
               Ver na TV
             </button>
-            {window.SAM_REVISAO && <window.SAM_REVISAO.Avisos
-              titulo="Revisão automática para o painel"
-              vazio="Nenhum aviso automático. Confira mesmo assim antes de liberar."
-              dados={window.SAM_REVISAO.dadosDoTrabalho(t, (Array.isArray(t.figuras) ? t.figuras : []).map(fg=>({ src:fg.url, titulo:fg.titulo, legenda:fg.legenda })))}/>}
             <div style={{ fontSize:13, fontWeight:800, color:C.tinta, marginBottom:4 }}>Decisão editorial</div>
             <div style={{ fontSize:12.5, color:C.cinza, marginBottom:12 }}>Confira a completude. Comentário obrigatório ao devolver para ajuste.</div>
             <textarea rows={3} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário para a equipe (o que falta, o que corrigir)…" style={{ ...campo, resize:"vertical" }} />
