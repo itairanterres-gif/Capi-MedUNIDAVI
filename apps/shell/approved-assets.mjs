@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 const packageSHA = '0b9a12ab60d721dc0fe2268ce17df025966c0101d23269f65a1129463fa5ec40';
-const manifestSHA = 'e22d34e7144e568509aaf521ac93cc54f9bec8cd67fbe0b79c7a192345774d20';
+const manifestSHA = 'c6e201e1cbd1763dd7560f92b56cf38fb05accb464d1f2ca7894b65ae95485c6';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function readApprovedAssets(env) {
   if (env.CAPI_AMRIGS_MANIFEST) {
