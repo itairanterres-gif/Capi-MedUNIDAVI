@@ -1,0 +1,20 @@
+-- Desfaz o esquema do SAM em produção (tabelas, dados e funções). Irreversível para os dados do SAM.
+begin;
+drop function if exists public.sam_contato_apresentador(t uuid) cascade;
+drop function if exists public.sam_ajustar_layout(t uuid, ajuste jsonb) cascade;
+drop function if exists public.sam_decidir_curadoria(t uuid, decisao text, comentario text) cascade;
+drop function if exists public.sam_criar_trabalhos_da_edicao(e text) cascade;
+drop function if exists public.sam_salvar_trabalho(t uuid, dados jsonb) cascade;
+drop function if exists public.sam_meu_trabalho(e text) cascade;
+drop function if exists public.sam_eh_autor(t uuid) cascade;
+drop function if exists public.sam_eh_curador() cascade;
+drop table if exists public.sam_curadoria_log cascade;
+drop table if exists public.sam_curadores cascade;
+drop table if exists public.sam_programa cascade;
+drop table if exists public.sam_apreciacoes cascade;
+drop table if exists public.sam_materiais cascade;
+drop table if exists public.sam_figuras cascade;
+drop table if exists public.sam_trabalho_autores cascade;
+drop table if exists public.sam_trabalhos cascade;
+drop table if exists public.sam_edicoes cascade;
+commit;
