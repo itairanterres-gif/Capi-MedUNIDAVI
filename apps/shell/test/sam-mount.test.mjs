@@ -42,7 +42,8 @@ test('SAM is served under /sam/ with Capi Supabase config and nothing private', 
     assert.ok(!config.includes('sb_secret_') && !config.includes('service_role'));
     const csp = (await fetch(base + '/sam/')).headers.get('content-security-policy');
     assert.match(csp, /connect-src 'self' http:\/\/127\.0\.0\.1:28478/);
-    assert.match(csp, /frame-ancestors 'none'/);
+    // O "Ver na TV" do SAM abre o pôster num quadro interno da mesma origem.
+    assert.match(csp, /frame-ancestors 'self'/);
     // Pré-compilado: sem inline, eval ou CDN de scripts.
     assert.match(csp, /script-src 'self';/);
     assert.ok(!/unsafe-eval|unpkg|jsdelivr/.test(csp));

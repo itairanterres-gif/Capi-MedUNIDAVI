@@ -17,7 +17,7 @@ const saida = fileURLToPath(new URL('./dist/', import.meta.url));
 
 // Páginas publicadas. Ferramentas internas (painéis de LED, prévias, bateria
 // de validação, demonstrações) ficam fora do Capi.
-export const paginas = ['index', 'edicao', 'submissao', 'curadoria', 'telao', 'material'];
+export const paginas = ['index', 'edicao', 'submissao', 'curadoria', 'telao', 'material', 'previa-tv'];
 
 // Trocas de CDN por cópias locais (mesmas versões fixadas no site original).
 const cdn = new Map([
@@ -41,7 +41,22 @@ function atributos(texto) {
   return a;
 }
 
+// previa-tv.html escreve seus scripts com document.write (e ?v= para furar cache).
+// No pacote vira lista estática; o cache já é no-store em todo o Capi.
+const carregadorPrevia = /<script>\s*\(function \(\) \{\s*var m = location\.search[\s\S]*?\}\)\(\);\s*<\/script>/;
+const estaticoPrevia = [
+  '<script src="data.js"></script>',
+  '<script src="esquema.js"></script>',
+  '<script src="ajuste.js"></script>',
+  '<script type="text/babel" src="lib.jsx"></script>',
+  '<script type="text/babel" src="posters.jsx"></script>',
+].join('\n  ');
+
 export async function transformarPagina(nome, html, compilar = jsx) {
+  if (nome === 'previa-tv') {
+    if (!carregadorPrevia.test(html)) throw new Error('Carregador da prévia mudou; ajuste build.mjs');
+    html = html.replace(carregadorPrevia, estaticoPrevia);
+  }
   const extras = [];
   let n = 0;
   const trocar = async (_tag, attrs, corpo) => {
