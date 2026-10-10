@@ -3,6 +3,7 @@ import { createPrivateImageView } from './private-image-ui.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { resolveIdentity } from './auth-contract.mjs';
 import { validateAuthConfig } from './config-contract.mjs';
+import { usableClues } from './clues.mjs';
 import { buildSession, catalogFilter, errorNotebook, filterPool, latestAttempts, pending, questionYear, validQuestion } from './amrigs-core.mjs';
 
 const el = id => document.getElementById(`amrigs-${id}`);
@@ -12,6 +13,49 @@ let client, identity, questions = [], attempts = [], session = null, feedbackId 
 let epoch = 0;
 let imageView, pilotContract, imagesReady = false;
 let activeQuestionId = null, questionOpenedAt = 0;
+// Grifos de pistas-chave por questão. O banco só entrega ao aluno os das
+// questões que ele já respondeu; docentes recebem todos.
+let clueRows = new Map();
+async function loadClues(questionId) {
+  let query = client.from('capi_question_clues').select('question_id,stem_sha256,clues').eq('context', 'AMRIGS').eq('status', 'ativo');
+  if (questionId) query = query.eq('question_id', questionId);
+  const { data, error } = await query;
+  if (error) return; // sem grifo, o treino segue normal
+  for (const row of data) clueRows.set(row.question_id, row);
+}
+// Enunciado com as pistas grifadas (marca-texto que corre) e a lista numerada.
+function marcarEnunciado(alvo, partes) {
+  alvo.replaceChildren(...partes.map(p => {
+    if (!p.n) return document.createTextNode(p.text);
+    const mark = document.createElement('mark'), sup = document.createElement('sup');
+    mark.className = 'pista'; mark.dataset.n = p.n; mark.style.setProperty('--atraso', `${(p.n - 1) * 0.35}s`);
+    mark.title = p.porque; sup.textContent = p.n; mark.append(p.text, sup); return mark;
+  }));
+}
+function listaPistas(partes, alvoEnunciado) {
+  const caixa = document.createElement('section'), topo = document.createElement('div'), titulo = document.createElement('strong'), botao = document.createElement('button');
+  caixa.className = 'pistas'; topo.className = 'pistas-topo';
+  titulo.textContent = 'Pistas-chave'; botao.type = 'button'; botao.className = 'link'; botao.textContent = 'Ocultar pistas';
+  botao.addEventListener('click', () => {
+    const off = alvoEnunciado.classList.toggle('pistas-ocultas'); caixa.classList.toggle('pistas-ocultas', off);
+    botao.textContent = off ? 'Mostrar pistas' : 'Ocultar pistas';
+  });
+  topo.append(titulo, botao);
+  const ol = document.createElement('ol');
+  for (const p of partes.filter(x => x.n)) { const li = document.createElement('li'); li.dataset.n = p.n; li.textContent = p.porque || p.text; ol.append(li); }
+  caixa.append(topo, ol);
+  // Tocar no trecho acende a explicação e vice-versa.
+  const acender = n => { for (const x of [...alvoEnunciado.querySelectorAll('.pista'), ...ol.children]) x.classList.toggle('ativa', x.dataset.n === n && !x.classList.contains('ativa')); };
+  alvoEnunciado.onclick = e => { const m = e.target.closest('.pista'); if (m) acender(m.dataset.n); };
+  ol.onclick = e => { const li = e.target.closest('li'); if (li) acender(li.dataset.n); };
+  return caixa;
+}
+async function grifar(q, alvoEnunciado, alvoLista, aindaValido) {
+  const partes = await usableClues(q, clueRows.get(q.id));
+  if (!partes || !aindaValido()) return;
+  marcarEnunciado(alvoEnunciado, partes); alvoEnunciado.classList.add('com-pistas');
+  alvoLista.append(listaPistas(partes, alvoEnunciado));
+}
 const byId = () => new Map(questions.map(q => [q.id, q]));
 function option(label, value) { return new Option(label, value); }
 function imageNodes(images) { return imageView.mount(images).nodes; }
@@ -56,6 +100,7 @@ function renderQuestion(q) {
   if (activeQuestionId !== q.id) { activeQuestionId = q.id; questionOpenedAt = Date.now(); }
   show('activity', true); show('setup', false); show('summary', false);
   set('progress', `Questão ${Object.keys(session.answered).length + (finished ? 0 : 1)} de ${session.questionIds.length}`);
+  el('title').classList.remove('com-pistas', 'pistas-ocultas'); el('title').onclick = null;
   set('title', b.stem); set('source', `${b.area || ''} · ${b.source || 'AMRIGS'}`);
   imagesReady = false;
   const button = el('form').querySelector('button'); button.disabled = true;
@@ -96,6 +141,9 @@ function renderQuestion(q) {
     const heading = document.createElement('strong'), pearl = document.createElement('p');
     heading.textContent = latest?.is_correct ? 'Boa decisão clínica.' : 'Vamos transformar o erro em revisão.';
     pearl.textContent = b.pearl || ''; el('feedback').append(heading, pearl);
+    // Grifo só depois da resposta (o banco também só o entrega nesse momento).
+    el('title').classList.remove('com-pistas', 'pistas-ocultas');
+    void grifar(q, el('title'), el('feedback'), () => feedbackId === q.id && activeQuestionId === q.id);
     set('next', pending(session).length ? 'Próxima questão' : 'Ver resultado');
   }
 }
@@ -143,6 +191,7 @@ function catalogItem(q) {
       details.append(div);
     }
     if (b.pearl) { const p = document.createElement('p'); p.className = 'perola'; p.textContent = b.pearl; details.append(p); }
+    void grifar(q, stem, details, () => details.isConnected);
   });
   return details;
 }
@@ -192,6 +241,8 @@ async function refresh() {
       questions = q.data.filter(validQuestion).filter(value => pilotQuestionAllowed(pilotContract, value.id));
       if (!questions.length) { set('status', 'O catálogo docente ainda não está disponível para a sua conta.'); return; }
       set('status', 'Catálogo docente: consulta às questões liberadas para os alunos.');
+      clueRows = new Map(); await loadClues();
+      if (current !== epoch) return;
       catalogShown = CATALOGO_PAGINA; catalogSetup(); renderCatalog(); return;
     }
     if (!['aluno', 'egresso'].includes(identity.role)) { set('status', 'O treino está disponível somente para estudantes.'); return; }
@@ -203,6 +254,8 @@ async function refresh() {
     if (q.error || a.error || s.error) throw q.error || a.error || s.error;
     if (current !== epoch) return;
     questions = q.data.filter(validQuestion).filter(value => pilotQuestionAllowed(pilotContract, value.id)); attempts = a.data;
+    clueRows = new Map(); await loadClues();
+    if (current !== epoch) return;
     session = s.data ? { config: s.data.config, questionIds: s.data.question_ids,
       answered: s.data.answered, startedAt: s.data.started_at } : null;
     render();
@@ -251,6 +304,7 @@ try {
       if (result.error) throw result.error;
       attempts.push(result.data); session.answered[id] = result.data.is_correct; feedbackId = id;
       try { await saveSession(); } catch { set('status', 'Resposta salva; posição não sincronizou. Recarregue para tentar novamente.'); }
+      await loadClues(id);
       render();
     });
   });

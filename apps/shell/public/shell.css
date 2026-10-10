@@ -53,3 +53,22 @@
 .amrigs .figure-note { background: #fff7e6; border: 1px solid #f0d9a0; border-radius: 6px; padding: 10px 12px; color: #7a5a12; }
 .amrigs fieldset label.alt-correta { border-color: #1f8a5b; background: #e7f5ee; box-shadow: inset 4px 0 0 #1f8a5b; }
 .amrigs fieldset label.alt-errada { border-color: #c0392b; background: #fbeae8; box-shadow: inset 4px 0 0 #c0392b; }
+/* Grifo das pistas-chave (pós-resposta): marca-texto âmbar na metade de baixo
+   da linha, que corre da esquerda para a direita, uma pista após a outra.
+   Âmbar porque verde e vermelho já significam certo e errado. */
+.amrigs mark.pista { color: inherit; background: linear-gradient(transparent 56%, rgba(240, 177, 50, .45) 56%) no-repeat; background-size: 0% 100%; border-radius: 2px; padding: 0 1px; cursor: pointer; animation: pista-corre .55s ease-out var(--atraso, 0s) forwards; }
+.amrigs mark.pista sup { font-size: .68em; font-weight: 700; color: #8a5a00; margin-left: 2px; }
+.amrigs mark.pista.ativa { background-image: linear-gradient(transparent 40%, rgba(240, 177, 50, .7) 40%); }
+.amrigs .pistas-ocultas mark.pista { animation: none; background-size: 0% 100%; }
+.amrigs .pistas-ocultas mark.pista sup { visibility: hidden; }
+@keyframes pista-corre { to { background-size: 100% 100%; } }
+@media (prefers-reduced-motion: reduce) { .amrigs mark.pista { animation: none; background-size: 100% 100%; } }
+.amrigs .pistas { margin-top: 14px; padding-top: 10px; border-top: 1px solid #d9e0e7; }
+.amrigs .pistas-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.amrigs .pistas-topo strong { color: #6b4a00; }
+.amrigs .pistas button.link { background: none; border: 0; padding: 0; margin: 0; color: #164576; text-decoration: underline; cursor: pointer; font: inherit; font-size: 14px; }
+.amrigs .pistas ol { margin: 8px 0 0; padding-left: 0; list-style: none; counter-reset: pista; }
+.amrigs .pistas li { counter-increment: pista; display: flex; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 15px; line-height: 1.45; }
+.amrigs .pistas li::before { content: counter(pista); flex: 0 0 22px; height: 22px; border-radius: 50%; background: #fbe7bd; color: #6b4a00; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.amrigs .pistas li.ativa { background: #fdf3dc; }
+.amrigs .pistas.pistas-ocultas ol { display: none; }
