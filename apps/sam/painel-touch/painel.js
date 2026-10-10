@@ -13,6 +13,8 @@
   const params = new URLSearchParams(location.search);
   const DADOS = params.get("dados") || "../site/xi_sam.json";
   const BASE_IMG = params.get("imagens") || "../site/";
+  // Fonte: banco do Capi (XII), quando servido pelo /sam/ com SAM_BACKEND em modo supabase.
+  const doBanco = !params.get("dados") && window.SAM_BACKEND && window.SAM_BACKEND.modo === "supabase" && window.SAM_PAINEL_DADOS;
   const OCIOSO_MS = 120000; // sem toque por 2 min → volta à galeria
 
   const AREA_COR = {
@@ -78,7 +80,8 @@
   }
   /* texto do aluno: nó próprio, marcado para a verificação */
   const doAluno = (tag, campo, texto, attrs) => { const n = el(tag, { ...(attrs || {}), "data-campo": campo }); n.textContent = texto; return n; };
-  const img = (f) => BASE_IMG + f.url;
+  // URL absoluta (armazenamento do Capi, XII) vale como está; relativa (arquivo da XI) usa a base.
+  const img = (f) => (/^https?:\/\//.test(f.url) ? f.url : BASE_IMG + f.url);
   const figs = (t) => (t.figuras || []).slice().sort((a, b) => a.ordem - b.ordem);
   const principal = (t) => figs(t).find((f) => f.principal) || figs(t)[0] || null;
   const autores = (t) => (Array.isArray(t.autores) && t.autores.length ? t.autores : [t.autor].filter(Boolean));
@@ -109,8 +112,8 @@
     }));
     const rola = el("div", { class: "rola", style: "flex:1" }, grade);
     const tela = el("div", { class: "tela" },
-      el("div", { class: "topo" }, el("div", { class: "marca" }, "XI SAM · Medicina UNIDAVI"),
-        el("h1", {}, "Pôsteres"), el("div", { style: "font-size:22px;margin-top:8px;opacity:.85" }, `${lista.length} trabalhos · toque em um pôster para abrir`)),
+      el("div", { class: "topo" }, el("div", { class: "marca" }, (doBanco ? "XII" : "XI") + " SAM · Medicina UNIDAVI"),
+        el("h1", {}, "Pôsteres"), el("div", { style: "font-size:22px;margin-top:8px;opacity:.85" }, `${lista.length} ${lista.length === 1 ? "trabalho" : "trabalhos"} · toque em um pôster para abrir`)),
       el("div", { class: "filtros" },
         el("button", { class: filtro ? "" : "ativo", onclick: () => { filtro = null; scrollGaleria.y = 0; render(); } }, "Todas as áreas"),
         areas.map((a) => el("button", { class: filtro === a ? "ativo" : "", onclick: () => { filtro = a; scrollGaleria.y = 0; render(); } }, a))),
@@ -257,11 +260,19 @@
   const acorda = () => { clearTimeout(ocioso); ocioso = setTimeout(() => { filtro = null; scrollGaleria.y = 0; ir("#/"); }, OCIOSO_MS); };
   ["pointerdown", "keydown", "wheel"].forEach((ev) => addEventListener(ev, acorda, { passive: true }));
 
-  fetch(DADOS).then((r) => r.json()).then((d) => {
+  // Fonte dos trabalhos: o banco do Capi (XII) quando o painel é servido pelo /sam/
+  // (há SAM_BACKEND em modo supabase); senão o arquivo (XI, testes).
+  const carregar = doBanco
+    ? window.SAM_BACKEND.listarPublicados().then((r) => ({ trabalhos: r.trabalhos.map(window.SAM_PAINEL_DADOS.paraPainel) }))
+    : fetch(DADOS).then((r) => r.json());
+  carregar.then((d) => {
     // Só o que a curadoria liberou chega ao painel.
     TRABALHOS = (d.trabalhos || []).filter((t) => t.camada === "poster_tc1" && (t.statusCuradoria == null || t.statusCuradoria === "publicado"));
     window.SAM_PAINEL = { TRABALHOS, secoesDe }; // usado por verificar.mjs
     render(); acorda();
+    document.documentElement.dataset.pronto = "1";
+  }).catch(() => {
+    palco.replaceChildren(el("p", { class: "txt" }, "Não foi possível carregar os pôsteres agora. Tente novamente em instantes."));
     document.documentElement.dataset.pronto = "1";
   });
 })();

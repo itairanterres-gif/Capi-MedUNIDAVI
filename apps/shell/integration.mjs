@@ -75,9 +75,11 @@ const samTypes = { ...types, '.json': 'application/json; charset=utf-8', '.jpg':
 export async function samAsset(root, pathname) {
   let name;
   try { name = decodeURIComponent(pathname.slice('/sam/'.length)) || 'index.html'; } catch { return null; }
+  if (name === 'painel-touch/') name = 'painel-touch/index.html';   // pasta do painel (o Cloudflare faz o mesmo)
   if (name.includes('\\') || name.includes('\0') || name.split('/').some(p => !p || p.startsWith('.') || p.startsWith('_'))) return null;
   const partes = name.split('/');
-  if (partes.length > 1 && !['assets', 'vendor'].includes(partes[0])) return null;
+  if (partes.length > 1 && !['assets', 'vendor', 'painel-touch'].includes(partes[0])) return null;
+  if (partes[0] === 'painel-touch' && partes.length > 2) return null;     // só os arquivos do painel, sem subpastas
   const type = samTypes[path.extname(name).toLowerCase()];
   if (!type || name === 'sam-config.js') return null;
   try {

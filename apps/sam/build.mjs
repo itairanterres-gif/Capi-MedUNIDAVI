@@ -105,6 +105,10 @@ export async function buildSam() {
     await mkdir(path.join(saida, path.dirname(rel)), { recursive: true });
     await cp(path.join(site, rel), path.join(saida, rel));
   }
+  // Painel touch (pôsteres em painel vertical): só o que roda, sem verificador, relatório nem rascunhos.
+  const painel = fileURLToPath(new URL('./painel-touch/', import.meta.url));
+  await mkdir(path.join(saida, 'painel-touch'), { recursive: true });
+  for (const f of ['index.html', 'painel.css', 'painel.js', 'dados.js']) await cp(path.join(painel, f), path.join(saida, 'painel-touch', f));
   const jsxs = (await readdir(site)).filter(f => f.endsWith('.jsx'));
   for (const f of jsxs) await writeFile(path.join(saida, f.replace(/\.jsx$/, '.js')), await jsx(await readFile(path.join(site, f), 'utf8')));
   for (const nome of paginas) {

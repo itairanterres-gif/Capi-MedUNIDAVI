@@ -9,7 +9,7 @@ async function fixture() {
   const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'sam-')));
   const files = {
     'index.html': '<!doctype html><title>SAM</title>', 'lib.js': 'const x = 1;', 'lib.jsx': 'const x = <b/>;', 'sam-config.js': 'window.SAM_CONFIG = null;',
-    'xi_sam.json': '{"edicao":{}}', 'vendor/supabase.js': '//', 'assets/xi/a.png': 'png',
+    'xi_sam.json': '{"edicao":{}}', 'painel-touch/index.html': '<!doctype html>', 'painel-touch/painel.js': '//', 'painel-touch/verificar.mjs': '//', 'painel-touch/para-a-frente-principal/revisao.js': '//', 'vendor/supabase.js': '//', 'assets/xi/a.png': 'png',
     'supabase/proposta/schema.sql': 'secret plan', 'dados-origem/contas.json': '{"senha":"x"}',
     '.git/config': '[core]', '_test/x.html': 'x', 'docs/plano.md': '#',
   };
@@ -30,10 +30,10 @@ test('SAM is served under /sam/ with Capi Supabase config and nothing private', 
     const redirect = await fetch(base + '/sam', { redirect: 'manual' });
     assert.equal(redirect.status, 302);
     assert.equal(redirect.headers.get('location'), '/sam/');
-    for (const ok of ['/sam/', '/sam/lib.js', '/sam/xi_sam.json', '/sam/vendor/supabase.js', '/sam/assets/xi/a.png'])
+    for (const ok of ['/sam/', '/sam/lib.js', '/sam/xi_sam.json', '/sam/vendor/supabase.js', '/sam/assets/xi/a.png', '/sam/painel-touch/', '/sam/painel-touch/painel.js'])
       assert.equal((await fetch(base + ok)).status, 200, ok);
     for (const bad of ['/sam/supabase/proposta/schema.sql', '/sam/dados-origem/contas.json', '/sam/.git/config', '/sam/_test/x.html',
-      '/sam/docs/plano.md', '/sam/lib.jsx', '/sam/%2e%2e/server.mjs', '/sam/..%2fserver.mjs', '/sam/vendor/../dados-origem/contas.json'])
+      '/sam/docs/plano.md', '/sam/painel-touch/verificar.mjs', '/sam/painel-touch/para-a-frente-principal/revisao.js', '/sam/lib.jsx', '/sam/%2e%2e/server.mjs', '/sam/..%2fserver.mjs', '/sam/vendor/../dados-origem/contas.json'])
       assert.equal((await fetch(base + bad)).status, 404, bad);
     const config = await (await fetch(base + '/sam/sam-config.js')).text();
     assert.match(config, /"backend":"supabase"/);
