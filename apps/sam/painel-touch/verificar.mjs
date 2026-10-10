@@ -1,5 +1,5 @@
 // Verificação do painel touch, pôster por pôster, no tamanho real (1080×1920).
-//   node apps/sam/painel-touch/verificar.mjs [pasta-de-capturas]
+//   node apps/sam/painel-touch/verificar.mjs [pasta-de-capturas] [--dados=site/outro.json]
 //
 // 1. INTEGRIDADE (bloqueia): todo texto do aluno exibido na vitrine e na
 //    leitura é comparado, caractere por caractere, com o JSON de origem; e o
@@ -16,7 +16,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const raiz = fileURLToPath(new URL('../', import.meta.url)); // apps/sam/
-const capturas = process.argv[2] || null;
+const args = process.argv.slice(2);
+const capturas = args.find((a) => !a.startsWith('--')) || null;
+const arqDados = (args.find((a) => a.startsWith('--dados=')) || '--dados=site/xi_sam.json').slice(8);
 
 let chromium;
 try { ({ chromium } = await import('playwright')); }
@@ -30,14 +32,14 @@ const servidor = createServer(async (req, res) => {
   const p = path.normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
   const arq = path.join(raiz, p);
   if (!arq.startsWith(raiz)) { res.writeHead(403).end(); return; }
-  try { res.writeHead(200, { 'content-type': tipos[path.extname(arq)] || 'application/octet-stream' }).end(await readFile(arq)); }
+  try { const corpo = await readFile(arq); res.writeHead(200, { 'content-type': tipos[path.extname(arq)] || 'application/octet-stream' }).end(corpo); }
   catch { res.writeHead(404).end(); }
 }).listen(0, '127.0.0.1');
 await new Promise((r) => servidor.once('listening', r));
-const base = `http://127.0.0.1:${servidor.address().port}/painel-touch/index.html?real=1`;
+const base = `http://127.0.0.1:${servidor.address().port}/painel-touch/index.html?real=1&dados=${encodeURIComponent('../' + arqDados)}`;
 
-const dados = JSON.parse(await readFile(path.join(raiz, 'site/xi_sam.json'), 'utf8'));
-const posters = dados.trabalhos.filter((t) => t.camada === 'poster_tc1');
+const dados = JSON.parse(await readFile(path.join(raiz, arqDados), 'utf8'));
+const posters = dados.trabalhos.filter((t) => t.camada === 'poster_tc1' && (t.statusCuradoria == null || t.statusCuradoria === 'publicado'));
 
 const navegador = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
 const pagina = await navegador.newPage({ viewport: { width: 1080, height: 1920 } });
@@ -51,6 +53,16 @@ function esperado(t, secoes) {
   (t.figuras || []).forEach((f) => { m.set(`fig:${f.ordem}:titulo`, f.titulo); m.set(`fig:${f.ordem}:legenda`, f.legenda); });
   if (secoes.ok) secoes.lista.forEach((s, i) => m.set(`secao:${i}`, s.texto));
   return m;
+}
+
+// Seções esperadas, calculadas aqui a partir do JSON e não do painel, para
+// que um erro na separação feita pelo painel também seja apanhado.
+const CHAVES = { padrao: ['introducao', 'objetivos', 'metodos', 'resultados'], relato: ['introducao', 'metodos', 'resultados', 'conclusao'] };
+function secoesEsperadas(t) {
+  const chaves = Number(t.fase) === 7 || !/relato de caso/i.test(t.desenho || '') ? CHAVES.padrao : CHAVES.relato;
+  if (chaves.some((k) => t[k] != null)) return { ok: true, lista: chaves.map((k) => ({ texto: t[k] || '' })) };
+  const partes = (t.resumo || '').split('\n\n');
+  return partes.length === chaves.length ? { ok: true, lista: partes.map((texto) => ({ texto })) } : { ok: false, lista: [] };
 }
 
 // Sequências de 8+ palavras que reaparecem adiante no texto. Repetição curta
@@ -82,7 +94,7 @@ if (capturas) await pagina.screenshot({ path: path.join(capturas, '00-galeria.pn
 
 for (const [i, t] of posters.entries()) {
   const r = { id: t.id, titulo: t.titulo, erros: [], sinais: [] };
-  const secoes = await pagina.evaluate((id) => window.SAM_PAINEL.secoesDe(window.SAM_PAINEL.TRABALHOS.find((x) => x.id === id)), t.id);
+  const secoes = secoesEsperadas(t);
   const exp = esperado(t, secoes);
   const confere = (tela, pares) => {
     for (const [campo, texto] of pares) {
@@ -112,13 +124,14 @@ for (const [i, t] of posters.entries()) {
   confere('leitura', pares);
   const naLeitura = new Map(pares);
   const completo = secoes.ok ? secoes.lista.map((_, k) => naLeitura.get(`secao:${k}`)).join('\n\n') : naLeitura.get('resumo');
-  if (completo !== t.resumo) r.erros.push('leitura: o texto completo não aparece inteiro e idêntico');
+  const original = secoes.ok ? secoes.lista.map((s) => s.texto).join('\n\n') : t.resumo;
+  if (completo !== original) r.erros.push('leitura: o texto completo não aparece inteiro e idêntico');
   for (const [campo, valor] of exp) {
     if (valor && campo !== 'autor' && !naLeitura.has(campo) && !(campo === 'resumo' && secoes.ok) && !(campo.startsWith('secao:') && !secoes.ok))
       r.erros.push(`leitura: ${campo} não aparece`);
   }
 
-  if (!secoes.ok) r.sinais.push(`seções não separáveis automaticamente (${t.resumo.split('\n\n').length} blocos para 4 seções) — texto exibido inteiro`);
+  if (!secoes.ok) r.sinais.push(`seções não separáveis automaticamente (${(t.resumo || '').split('\n\n').length} blocos para 4 seções) — texto exibido inteiro`);
   const figs = await pagina.evaluate(() => [...document.querySelectorAll('.leitura figure img')].map((im) => ({ src: im.getAttribute('src'), nat: im.naturalWidth, tela: im.getBoundingClientRect().width })));
   for (const f of figs) {
     if (!f.nat) r.sinais.push(`figura não carregou: ${f.src}`);
@@ -126,7 +139,7 @@ for (const [i, t] of posters.entries()) {
   }
   const abaixo4k = figs.filter((f) => f.nat >= f.tela && f.nat < f.tela * 2).length;
   if (abaixo4k) r.notas = `${abaixo4k} de ${figs.length} figura(s) abaixo da nitidez 4K nativa (legíveis; não sinalizado)`;
-  const rep = repetidos(t.resumo);
+  const rep = repetidos(original || '');
   const longos = rep.filter((x) => x.palavras >= 25);
   if (longos.length) r.sinais.push(`possível parágrafo duplicado: ${longos.length} trecho(s) de 25+ palavras aparecem duas vezes, ex.: "${longos[0].inicio}…" (${longos[0].palavras} palavras) — conferir com o aluno`);
   else if (rep.length) r.sinais.push(`repetição curta (${rep.map((x) => x.palavras).join(', ')} palavras), provavelmente intencional: "${rep[0].inicio}…"`);
@@ -139,7 +152,7 @@ for (const [i, t] of posters.entries()) {
 await navegador.close();
 servidor.close();
 
-console.log(`# Verificação do painel touch — ${posters.length} pôsteres do XI SAM\n`);
+console.log(`# Verificação do painel touch — ${posters.length} pôsteres (${arqDados})\n`);
 console.log(`Integridade do texto: ${posters.length - reprovados} aprovados, ${reprovados} reprovados.\n`);
 for (const r of relatorio) {
   if (!r.erros.length && !r.sinais.length && !r.notas) continue;

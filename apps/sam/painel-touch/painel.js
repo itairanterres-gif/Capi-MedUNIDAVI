@@ -30,26 +30,31 @@
      projeto. `sec` = valor de figura.secao que se ancora naquela seção. */
   const SECOES = {
     padrao: [
-      { rotulo: "Introdução", sec: "Introdução" },
-      { rotulo: "Objetivo", sec: null },
-      { rotulo: "Metodologia", sec: "Métodos" },
-      { rotulo: "Resultados esperados", sec: "Resultados" },
+      { rotulo: "Introdução", chave: "introducao", sec: "Introdução" },
+      { rotulo: "Objetivo", chave: "objetivos", sec: null },
+      { rotulo: "Metodologia", chave: "metodos", sec: "Métodos" },
+      { rotulo: "Resultados esperados", chave: "resultados", sec: "Resultados" },
     ],
     relato: [
-      { rotulo: "Introdução", sec: "Introdução" },
-      { rotulo: "Apresentação do caso", sec: "Métodos" },
-      { rotulo: "Discussão", sec: "Resultados" },
-      { rotulo: "Conclusões", sec: "Discussão" },
+      { rotulo: "Introdução", chave: "introducao", sec: "Introdução" },
+      { rotulo: "Apresentação do caso", chave: "metodos", sec: "Métodos" },
+      { rotulo: "Discussão", chave: "resultados", sec: "Resultados" },
+      { rotulo: "Conclusões", chave: "conclusao", sec: "Discussão" },
     ],
   };
   const ehProjeto = (t) => Number(t.fase) === 7 || !/relato de caso/i.test(t.desenho || "");
 
-  /* As seções do XI chegaram unidas por linha em branco. Só separamos
-     quando há exatamente uma parte por seção; senão o texto aparece
-     inteiro, num bloco único, e o pôster vai para a curadoria. Em
-     nenhum caso um caractere é acrescentado ou retirado. */
+  /* A partir da XII cada seção vem no seu próprio campo (introducao,
+     objetivos…), como o formulário de submissão grava. No arquivo do XI
+     as seções chegaram unidas por linha em branco em `resumo`: só
+     separamos quando há exatamente uma parte por seção; senão o texto
+     aparece inteiro, num bloco único. Em nenhum caso um caractere é
+     acrescentado ou retirado. */
   function secoesDe(t) {
     const esq = ehProjeto(t) ? SECOES.padrao : SECOES.relato;
+    if (esq.some((s) => t[s.chave] != null)) {
+      return { ok: true, lista: esq.map((s) => ({ ...s, texto: t[s.chave] || "" })) };
+    }
     const texto = t.resumo || "";
     const partes = texto.split("\n\n");
     if (partes.length === esq.length) {
@@ -253,7 +258,8 @@
   ["pointerdown", "keydown", "wheel"].forEach((ev) => addEventListener(ev, acorda, { passive: true }));
 
   fetch(DADOS).then((r) => r.json()).then((d) => {
-    TRABALHOS = (d.trabalhos || []).filter((t) => t.camada === "poster_tc1");
+    // Só o que a curadoria liberou chega ao painel.
+    TRABALHOS = (d.trabalhos || []).filter((t) => t.camada === "poster_tc1" && (t.statusCuradoria == null || t.statusCuradoria === "publicado"));
     window.SAM_PAINEL = { TRABALHOS, secoesDe }; // usado por verificar.mjs
     render(); acorda();
     document.documentElement.dataset.pronto = "1";

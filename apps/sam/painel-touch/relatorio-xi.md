@@ -1,4 +1,4 @@
-# Verificação do painel touch — 33 pôsteres do XI SAM
+# Verificação do painel touch — 33 pôsteres (site/xi_sam.json)
 
 Integridade do texto: 33 aprovados, 0 reprovados.
 
