@@ -173,45 +173,68 @@ function PosterApresentacao({ t, figuras, principal }) {
   const [ref, scale] = useScale(BW);
   const innerRef = useRef(null);
   const [alt, setAlt] = useState(BHmin);
+  const ajustando = useRef(false);
+  /* AJUSTE AUTOMÁTICO: acha a maior escala k (fontes e figuras juntas) em que o
+     conteúdo cabe em 1080×1920; se ainda sobrar espaço com a fonte no teto,
+     amplia só as figuras (kf). Se nem na escala mínima couber, o pôster cresce
+     em altura (nunca corta texto). O texto não muda: só o tamanho. */
+  const ajustar = () => {
+    const el = innerRef.current; if (!el || ajustando.current) return;
+    ajustando.current = true;
+    const K_MIN = 0.7, K_MAX = 1.8, KF_MAX = 3.4;
+    const natural = (k, kf) => {
+      el.style.setProperty("--k", String(k)); el.style.setProperty("--kf", String(kf));
+      el.style.minHeight = "0px"; const h = el.offsetHeight; el.style.minHeight = BHmin + "px"; return h;
+    };
+    let k = K_MIN, kf = K_MIN;
+    if (natural(K_MIN, K_MIN) <= BHmin) {
+      let lo = K_MIN, hi = K_MAX;
+      for (let i = 0; i < 10; i++) { const m = (lo + hi) / 2; if (natural(m, m) <= BHmin) lo = m; else hi = m; }
+      k = lo; kf = lo;
+      if (natural(K_MAX, K_MAX) <= BHmin) {
+        k = K_MAX; let a = K_MAX, b = KF_MAX;
+        for (let i = 0; i < 10; i++) { const m = (a + b) / 2; if (natural(K_MAX, m) <= BHmin) a = m; else b = m; }
+        kf = a;
+      }
+    }
+    const h = natural(k, kf);
+    ajustando.current = false;
+    setAlt((anterior) => { const novo = Math.max(BHmin, h); return Math.abs(novo - anterior) > 1 ? novo : anterior; });
+  };
   useLayoutEffect(()=>{
     const el = innerRef.current; if (!el) return;
-    const medir = () => setAlt(Math.max(BHmin, el.offsetHeight));
-    medir();
-    const ro = new ResizeObserver(medir); ro.observe(el);
+    ajustar();
+    const ro = new ResizeObserver(() => ajustar()); ro.observe(el);   // imagem que termina de carregar
     return () => ro.disconnect();
   },[]);
-  /* reforço: re-mede a cada render (digitação re-renderiza), caso o
-     ResizeObserver demore a entregar — garante pôster sem clipe. */
-  useLayoutEffect(()=>{
-    const el = innerRef.current; if (!el) return;
-    const h = Math.max(BHmin, el.offsetHeight);
-    if (Math.abs(h - alt) > 1) setAlt(h);
-  });
+  useLayoutEffect(()=>{ ajustar(); });   // a cada digitação
   const cor = AREA_COR[t.area] || C.azul;
   const fotoUrl = t.foto_autores_dataUrl || t.foto_autores_url;
   const tag = figuras.map((fg,idx)=>({ ...fg, _i:idx }));
   const by = (secs)=>tag.filter((x)=>secs.includes(x.secao));
   const fIntro=by(["Introdução"]), fMet=by(["Métodos"]), fRes=by(["Resultados"]);
   const fOutras=tag.filter((x)=>!["Introdução","Métodos","Resultados"].includes(x.secao));
+  const k = (n) => "calc(" + n + "px * var(--k, 1))";      // fonte/espaço escalam com o conteúdo
+  const kf = (n) => "calc(" + n + "px * var(--kf, 1))";    // figuras podem crescer mais que a fonte
   const FigAp = ({ fg }) => (
-    <div style={{ marginTop:18, border:`3px ${fg._i===principal?"solid":"dashed"} ${fg._i===principal?C.ciano:"#C9D6E4"}`, borderRadius:16, overflow:"hidden", background:fg._i===principal?C.cianoClaro:C.papel }}>
-      <div style={{ height:240, display:"flex", alignItems:"center", justifyContent:"center", background:"#fff", overflow:"hidden" }}>
+    <div style={{ marginTop:k(18), border:`3px ${fg._i===principal?"solid":"dashed"} ${fg._i===principal?C.ciano:"#C9D6E4"}`, borderRadius:16, overflow:"hidden", background:fg._i===principal?C.cianoClaro:C.papel, breakInside:"avoid" }}>
+      <div style={{ height:kf(240), display:"flex", alignItems:"center", justifyContent:"center", background:"#fff", overflow:"hidden" }}>
         {fg.dataUrl ? <img src={fg.dataUrl} alt="" style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain" }}/> : <ImageIcon size={56} color={C.cinza}/>}
       </div>
       <div style={{ padding:"13px 20px", lineHeight:1.3 }}>
-        <div style={{ fontSize:21, color:C.tinta, display:"flex", gap:8, alignItems:"baseline" }}>
+        <div style={{ fontSize:k(21), color:C.tinta, display:"flex", gap:8, alignItems:"baseline" }}>
           <strong style={{ color:C.azul, whiteSpace:"nowrap" }}>Fig {fg._i+1}.</strong>
           <span style={{ flex:1, fontWeight:fg.titulo?700:400 }}>{fg.titulo || fg.legenda || "título da figura"}</span>
-          {fg._i===principal && <span style={{ fontSize:17, fontWeight:800, color:C.ciano, whiteSpace:"nowrap" }}>★ PRINCIPAL</span>}
+          {fg._i===principal && <span style={{ fontSize:k(17), fontWeight:800, color:C.ciano, whiteSpace:"nowrap" }}>★ PRINCIPAL</span>}
         </div>
-        {fg.titulo && fg.legenda ? <div style={{ fontSize:18, color:C.cinza, marginTop:4 }}>{fg.legenda}</div> : null}
+        {fg.titulo && fg.legenda ? <div style={{ fontSize:k(18), color:C.cinza, marginTop:4 }}>{fg.legenda}</div> : null}
       </div>
     </div>
   );
   const Sec = ({ titulo, texto, figs }) => (texto || (figs && figs.length)) ? (
-    <div style={{ marginBottom:26 }}>
-      <div style={{ fontSize:26, fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, marginBottom:9 }}>{titulo}</div>
-      {texto && <div style={{ fontSize:24, lineHeight:1.42, color:C.tinta, textAlign:"justify", hyphens:"auto", WebkitHyphens:"auto" }}>{texto}</div>}
+    <div style={{ marginBottom:k(26) }}>
+      <div style={{ fontSize:k(26), fontWeight:800, color:cor, textTransform:"uppercase", letterSpacing:0.5, marginBottom:k(9), breakAfter:"avoid" }}>{titulo}</div>
+      {texto && <div style={{ fontSize:k(24), lineHeight:1.42, color:C.tinta, textAlign:"justify", hyphens:"auto", WebkitHyphens:"auto" }}>{texto}</div>}
       {figs && figs.map((fg)=><FigAp key={fg._i} fg={fg}/>)}
     </div>
   ) : null;
@@ -233,10 +256,16 @@ function PosterApresentacao({ t, figuras, principal }) {
             {fotoUrl && <div style={{ width:190, height:190, borderRadius:16, overflow:"hidden", flexShrink:0, border:"4px solid rgba(255,255,255,0.45)", background:"#fff" }}><img src={fotoUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/></div>}
           </div>
         </div>
-        {/* corpo: 2 colunas; cresce com o conteúdo (sem clipar) */}
-        <div style={{ flex:1, padding:"40px 56px 28px", display:"flex", gap:52 }}>
-          <div style={{ flex:1, minWidth:0 }}><Sec titulo="Introdução" texto={t.intro} figs={fIntro}/><Sec titulo="Objetivo" texto={t.objetivos}/><Sec titulo="Metodologia" texto={t.metodos} figs={fMet}/></div>
-          <div style={{ flex:1, minWidth:0 }}><Sec titulo={t.fase===7?"Resultados esperados":"Resultados"} texto={t.resultados} figs={fRes}/>{fOutras.length>0 && <Sec titulo="Figuras complementares" figs={fOutras}/>}</div>
+        {/* corpo: 2 colunas EQUILIBRADAS pelo conteúdo (o texto escorre de uma para a outra);
+            fonte e figuras escalam para preencher o pôster (ajustar) */}
+        <div style={{ flex:1, padding:"40px 56px 28px" }}>
+          <div style={{ columnCount:2, columnGap:52, columnFill:"balance" }}>
+            <Sec titulo="Introdução" texto={t.intro} figs={fIntro}/>
+            <Sec titulo="Objetivo" texto={t.objetivos}/>
+            <Sec titulo="Metodologia" texto={t.metodos} figs={fMet}/>
+            <Sec titulo={t.fase===7?"Resultados esperados":"Resultados"} texto={t.resultados} figs={fRes}/>
+            {fOutras.length>0 && <Sec titulo="Figuras complementares" figs={fOutras}/>}
+          </div>
         </div>
         {/* referências (seção curta recolhível no pé) */}
         <RefsPoster referencias={t.referencias}/>
