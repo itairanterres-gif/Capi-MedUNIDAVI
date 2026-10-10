@@ -195,3 +195,55 @@ do $$ begin
 exception when insufficient_privilege then raise notice 'OK 12c visitante não executa';
 end $$;
 reset role;
+
+-- 13. Figuras: só o autor (trabalho não publicado) ou a curadoria; caminhos só na pasta do trabalho.
+select pg_temp.como('B');
+do $$
+declare tb uuid := (select id from _ids where nome = 'TB');
+        outro uuid := (select id from public.sam_trabalhos where edicao_id = 'zzteste' and fase = 7);
+begin
+  perform public.sam_salvar_figuras(tb, jsonb_build_array(
+    jsonb_build_object('path', tb || '/fig1-abc12345.png', 'secao', 'Métodos', 'titulo', 'T', 'legenda', 'L')), tb || '/foto-xyz.jpg');
+  if (select count(*) from public.sam_figuras where trabalho_id = tb) <> 1 then raise exception 'figura não gravada'; end if;
+  begin perform public.sam_salvar_figuras(tb, jsonb_build_array(jsonb_build_object('path', outro || '/x.png')), null);
+    raise exception 'aceitou caminho de outro trabalho';
+  exception when raise_exception then if sqlerrm not like 'Caminho de figura inválido%' then raise; end if; end;
+  begin perform public.sam_salvar_figuras(tb, jsonb_build_array(jsonb_build_object('path', tb || '/../x.png')), null);
+    raise exception 'aceitou caminho com ..';
+  exception when raise_exception then if sqlerrm not like 'Caminho de figura inválido%' then raise; end if; end;
+  begin perform public.sam_salvar_figuras(outro, '[]'::jsonb, null);
+    raise exception 'aluno alterou trabalho alheio';
+  exception when raise_exception then if sqlerrm not like 'Sem acesso%' then raise; end if; end;
+  begin insert into public.sam_figuras (trabalho_id, ordem, secao, storage_path) values (tb, 2, 'Outra', tb || '/y.png');
+    raise exception 'aluno gravou figura direto';
+  exception when insufficient_privilege then null; end;
+  raise notice 'OK 13a aluno grava só as suas figuras, em caminhos válidos, só pela função';
+end $$;
+reset role;
+select pg_temp.como('B');
+do $$ begin
+  if (select foto_autores_path from public.sam_trabalhos where id = (select id from _ids where nome = 'TB')) is null then raise exception 'foto não gravada'; end if;
+  raise notice 'OK 13b foto gravada no trabalho do autor';
+end $$;
+reset role;
+select pg_temp.como('C');
+do $$ begin
+  perform public.sam_salvar_figuras((select id from _ids where nome = 'TB'), '[]'::jsonb, null);
+  raise notice 'OK 13c curadoria também pode ajustar figuras';
+end $$;
+reset role;
+select pg_temp.como('A');
+do $$ begin
+  begin perform public.sam_salvar_figuras((select id from _ids where nome = 'TB'), '[]'::jsonb, null);
+    raise exception 'aluna alterou figuras do colega';
+  exception when raise_exception then if sqlerrm not like 'Sem acesso%' then raise; end if; end;
+  raise notice 'OK 13d aluna não mexe nas figuras do colega';
+end $$;
+reset role;
+select pg_temp.como('anon');
+do $$ begin
+  begin perform public.sam_salvar_figuras((select id from _ids where nome = 'TB'), '[]'::jsonb, null); raise exception 'visitante gravou';
+  exception when insufficient_privilege then null; end;
+  raise notice 'OK 13e visitante não grava figuras';
+end $$;
+reset role;
