@@ -37,6 +37,7 @@ jobs:
           # qualquer visitante em /auth-config.json. Não é segredo; fica aqui para o
           # build não depender de configuração manual do repositório.
           CAPI_SUPABASE_PUBLISHABLE_KEY: sb_publishable_NX-BOzVTviT54HuFSpguHA_4TOYPGpc
+          CAPI_SAM_ENABLED: "1"
 
       - name: Testes
         run: node --test apps/shell/test/*.test.mjs scripts/*.test.mjs

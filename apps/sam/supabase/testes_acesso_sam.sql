@@ -17,17 +17,18 @@ alter table public.matriculas add column if not exists nome text,
 insert into _ids values ('A', gen_random_uuid()), ('B', gen_random_uuid()), ('C', gen_random_uuid());
 insert into auth.users (id, email, aud, role)
   select id, lower(nome) || '.sam@example.invalid', 'authenticated', 'authenticated' from _ids;
+-- Papel por literal (em produção role é um tipo próprio; no local, texto).
 insert into public.profiles (id, nome, email, role)
-  select id, 'Fictício ' || nome, lower(nome) || '.sam@example.invalid',
-         case nome when 'C' then 'professor' else 'aluno' end from _ids
+  select id, 'Fictício ' || nome, lower(nome) || '.sam@example.invalid', 'aluno' from _ids
   on conflict (id) do update set role = excluded.role, email = excluded.email;
+update public.profiles set role = 'professor' where id = (select id from _ids where nome = 'C');
 insert into public.matriculas (email, nome, turma, fase, situacao, semestre) values
   ('a.sam@example.invalid', 'Aluna Fictícia A', 'TX', 7, 'Ativo', '2099-2'),
   ('b.sam@example.invalid', 'Aluno Fictício B', 'TX', 8, 'Pré-Matrícula', '2099-2'),  -- conta como matriculado
   ('d.sam@example.invalid', 'Aluno Fictício D', 'TX', 6, 'Ativo', '2099-2');          -- 6ª fase: fora do SAM
 insert into public.sam_edicoes (id, numero, nome, data_inicio, data_fim, semestre)
   values ('zzteste', 99, 'Edição de teste', '2099-11-23', '2099-11-27', '2099-2');
-insert into public.sam_curadores (user_id) select id from _ids where nome = 'C';
+insert into public.sam_curadores (email) values ('c.sam@example.invalid');
 
 create function pg_temp.como(quem text) returns void language plpgsql as $$
 begin

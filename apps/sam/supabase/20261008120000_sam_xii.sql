@@ -146,8 +146,10 @@ create table public.sam_programa (
 );
 
 -- Curadoria (NPCMed) substitui a senha compartilhada por conta Capi + papel.
+-- Por e-mail institucional: a professora vira curadora assim que criar a
+-- conta no Capi com esse e-mail (não precisa existir conta antes).
 create table public.sam_curadores (
-  user_id uuid primary key references public.profiles(id),
+  email text primary key check (email = lower(email) and email like '%@%'),
   incluido_em timestamptz not null default now()
 );
 
@@ -164,7 +166,8 @@ create table public.sam_curadoria_log (
 
 create function public.sam_eh_curador() returns boolean
 language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.sam_curadores c where c.user_id = auth.uid())
+  select exists (select 1 from public.sam_curadores c join public.profiles p on lower(p.email) = c.email
+                 where p.id = auth.uid())
       or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin');
 $$;
 
@@ -188,12 +191,12 @@ grant execute on function public.sam_eh_autor(uuid) to anon, authenticated;
 -- pelas políticas, então "o meu" precisa vir do vínculo por e-mail, que o
 -- navegador não enxerga.
 create function public.sam_meu_trabalho(e text) returns uuid
-language sql stable security definer set search_path = '' as $
+language sql stable security definer set search_path = '' as $$
   select w.id from public.sam_trabalhos w
   join public.profiles p on p.id = auth.uid()
   where w.edicao_id = e and lower(p.email) = lower(w.apresentador_email)
   limit 1;
-$;
+$$;
 revoke all on function public.sam_meu_trabalho(text) from public, anon;
 grant execute on function public.sam_meu_trabalho(text) to authenticated;
 
