@@ -325,9 +325,9 @@ function Home() {
               <>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <div style={{ width:26, height:26, borderRadius:7, background:`${C.ciano}1A`, color:C.azul, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:11, flexShrink:0 }}>P{p.n}</div>
-                  <span style={{ ...chip(true, cor), padding:"3px 10px", fontSize:11 }}>{p.area}</span>
+                  {p.area ? <span style={{ ...chip(true, cor), padding:"3px 10px", fontSize:11 }}>{p.area}</span> : null}
                 </div>
-                <div style={{ fontSize:13.5, fontWeight:700, color:C.tinta, lineHeight:1.3 }}>{p.titulo}</div>
+                {p.titulo ? <div style={{ fontSize:13.5, fontWeight:700, color:C.tinta, lineHeight:1.3 }}>{p.titulo}</div> : null}
                 <div style={{ display:"flex", alignItems:"center", gap:9, marginTop:4 }}>
                   <AvatarAutor url={t ? (t.foto_autores_url || t.foto_autores_dataUrl) : null} size={32} />
                   <span style={{ fontSize:12.5, color:C.cinza, flex:1, minWidth:0 }}>{t ? nomeApresentador(p, t) : p.ap}</span>
