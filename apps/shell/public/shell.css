@@ -72,3 +72,5 @@
 .amrigs .pistas li::before { content: counter(pista); flex: 0 0 22px; height: 22px; border-radius: 50%; background: #fbe7bd; color: #6b4a00; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .amrigs .pistas li.ativa { background: #fdf3dc; }
 .amrigs .pistas.pistas-ocultas ol { display: none; }
+/* Enunciado com colunas, itens e afirmativas em linhas próprias (stemDisplay). */
+.amrigs #amrigs-title, .amrigs .enunciado { white-space: pre-line; }
