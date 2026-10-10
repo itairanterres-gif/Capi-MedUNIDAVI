@@ -255,6 +255,10 @@ function Ficha({ t, email, senha, onVoltar, onAtualizar }) {
 
           {/* AÇÕES DE CURADORIA */}
           <div style={{ borderTop:"1px solid #EEF2F6", background:"#FBFDFE", padding:"20px 24px" }}>
+            {window.SAM_REVISAO && <window.SAM_REVISAO.Avisos
+              titulo="Revisão automática para o painel"
+              vazio="Nenhum aviso automático. Confira mesmo assim antes de liberar."
+              dados={window.SAM_REVISAO.dadosDoTrabalho(t, (Array.isArray(t.figuras) ? t.figuras : []).map(fg=>({ src:fg.url, titulo:fg.titulo, legenda:fg.legenda })))}/>}
             <div style={{ fontSize:13, fontWeight:800, color:C.tinta, marginBottom:4 }}>Decisão editorial</div>
             <div style={{ fontSize:12.5, color:C.cinza, marginBottom:12 }}>Confira a completude. Comentário obrigatório ao devolver para ajuste.</div>
             <textarea rows={3} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário para a equipe (o que falta, o que corrigir)…" style={{ ...campo, resize:"vertical" }} />
